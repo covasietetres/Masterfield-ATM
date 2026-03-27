@@ -4,12 +4,19 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 
 // ── Clientes ─────────────────────────────────────────────────────────────────
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// ── Clientes Lazy ────────────────────────────────────────────────────────────
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+function getGenAI() {
+  const key = process.env.GEMINI_API_KEY!;
+  if (!key) return null;
+  return new GoogleGenerativeAI(key);
+}
 
 // ── Chunking: divide el texto en partes con overlap ──────────────────────────
 function chunkText(text: string, chunkSize = 1000, overlap = 200): string[] {
@@ -24,6 +31,13 @@ function chunkText(text: string, chunkSize = 1000, overlap = 200): string[] {
 
 // ── POST /api/ingest ──────────────────────────────────────────────────────────
 export async function POST(request: Request) {
+  const supabase = getSupabase();
+  const genAI = getGenAI();
+
+  if (!supabase || !genAI) {
+    return NextResponse.json({ error: 'Configuración de servidor incompleta (Variables de entorno).' }, { status: 500 });
+  }
+
   try {
     const { documentId, bucket, path, fileType } = await request.json();
 

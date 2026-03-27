@@ -3,26 +3,19 @@ import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // 1. Verificamos que las llaves existan antes de inicializar Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-let supabase: any;
-if (supabaseUrl && supabaseKey) {
-  supabase = createClient(supabaseUrl, supabaseKey);
-}
-
 export async function POST(request: Request) {
-  try {
-    // 2. Validaciones de entorno críticas
-    if (!supabaseUrl || !supabaseKey) {
-      console.error("FALTAN LLAVES DE SUPABASE EN .env.local");
-      return NextResponse.json({ reply: "Error interno: Faltan credenciales de base de datos." }, { status: 500 });
-    }
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
 
-    if (!process.env.GEMINI_API_KEY) {
-      console.error("FALTA LLAVE DE GEMINI EN .env.local");
-      return NextResponse.json({ reply: "Error interno: Falta la llave de Inteligencia Artificial." }, { status: 500 });
-    }
+  if (!supabaseUrl || !supabaseKey || !geminiKey) {
+    return NextResponse.json({ reply: "Error interno: Faltan credenciales del servidor." }, { status: 500 });
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  const genAI = new GoogleGenerativeAI(geminiKey);
+
+  try {
 
     const { message, prompt, engineerId, mode = 'terminal' } = await request.json();
 
@@ -74,9 +67,7 @@ export async function POST(request: Request) {
       4. FORMATO: Usa Markdown para resaltar piezas o errores.
     `;
 
-    // 5. Conectar con Gemini de forma segura
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const aiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    const aiModel = genAI.getGenerativeModel({ model: "gemini-2.1-flash-lite" });
 
     const result = await aiModel.generateContent([
       { text: systemPrompt },

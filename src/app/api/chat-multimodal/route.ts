@@ -3,18 +3,32 @@ import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // ── Clientes ─────────────────────────────────────────────────────────────────
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
+// ── Configuración ─────────────────────────────────────────────────────────────
 const MODELO_CHAT      = 'gemini-2.5-flash-lite';
 const MODELO_EMBEDDING = 'text-embedding-004';
 
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
+
+function getGenAI() {
+  const key = process.env.GEMINI_API_KEY!;
+  if (!key) return null;
+  return new GoogleGenerativeAI(key);
+}
+
 // ── POST /api/chat-multimodal ─────────────────────────────────────────────────
 export async function POST(request: Request) {
+  const supabase = getSupabase();
+  const genAI = getGenAI();
+
+  if (!supabase || !genAI) {
+    return NextResponse.json({ error: 'Configuración de servidor incompleta (Variables de entorno).' }, { status: 500 });
+  }
+
   try {
     const body = await request.json();
     const { message, imageBase64, imageMimeType, engineerId } = body;
