@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { Activity, AlertTriangle, Cpu, Network } from 'lucide-react';
 
 export default function DashboardPage() {

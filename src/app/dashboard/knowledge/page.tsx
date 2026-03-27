@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect, useRef } from 'react';
 import { Upload, FileText, CheckCircle, Database, Eye, X, Trash2, PenTool, MapPin, Tag, RotateCcw, Volume2, VolumeX, BookOpen, AlignLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';

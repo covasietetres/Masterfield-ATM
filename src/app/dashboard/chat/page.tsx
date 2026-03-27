@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Mic, MicOff, Paperclip, X, Volume2, VolumeX, Zap, Database, ImagePlus, Loader2, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
