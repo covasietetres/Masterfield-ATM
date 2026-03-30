@@ -19,21 +19,37 @@ const isConfigured = !!(
 export const supabase = new Proxy({} as any, {
   get(target, prop) {
     if (!isConfigured) {
-      // Return a dummy object that won't crash on common accesses if used carefully
-      // but warn the developer
-      console.warn(`Supabase is not configured. Accessing "${String(prop)}" during build.`);
-      
-      // Handle nested access (like supabase.auth.getUser())
-      if (prop === 'auth') {
-        return {
-          getUser: async () => ({ data: { user: null }, error: null }),
-          onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-        };
+      if (typeof window !== 'undefined') {
+        console.warn(`Supabase is not configured. Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in environment.`);
       }
-      return undefined;
+      
+      const errorResponse = { 
+        data: { user: null, session: null }, 
+        error: { message: 'Configuración de Supabase incompleta. Verifica las variables de entorno en Vercel.' } 
+      };
+
+      if (prop === 'auth') {
+        return new Proxy({}, {
+          get(_, authProp) {
+            if (authProp === 'getUser') return async () => ({ data: { user: null }, error: null });
+            if (authProp === 'onAuthStateChange') return () => ({ data: { subscription: { unsubscribe: () => {} } } });
+            
+            // For any other auth method (signInWithPassword, signUp, etc.)
+            return async () => errorResponse;
+          }
+        });
+      }
+      
+      // Catch-all for other top-level properties (from, rpc, etc.)
+      return () => ({
+        select: () => ({ error: errorResponse.error }),
+        insert: () => ({ error: errorResponse.error }),
+        update: () => ({ error: errorResponse.error }),
+        delete: () => ({ error: errorResponse.error }),
+        rpc: () => ({ error: errorResponse.error }),
+      });
     }
     
-    // Initialize the real client on first access
     if (!target._instance) {
       target._instance = createBrowserClient(supabaseUrl!, supabaseAnonKey!);
     }
