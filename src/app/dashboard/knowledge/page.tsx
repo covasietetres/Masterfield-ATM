@@ -138,9 +138,15 @@ export default function KnowledgeBasePage() {
 
       if (dbError || !docData) throw new Error(`Error en registro: ${dbError?.message}`);
 
-      await handleReindex(docData, bucket);
-      setSuccess(true);
-      setFile(null);
+      const indexSuccess = await handleReindex(docData, bucket);
+      
+      if (indexSuccess) {
+        setSuccess(true);
+        setFile(null);
+      } else {
+        alert("Documento guardado, pero el procesamiento de IA falló. Puedes intentar re-indexar manualmente más tarde.");
+      }
+      
       fetchDocuments();
     } catch (error: any) {
       alert(error.message || 'Error al subir archivo.');
@@ -149,7 +155,7 @@ export default function KnowledgeBasePage() {
     }
   };
 
-  const handleReindex = async (doc: any, bucket?: string) => {
+  const handleReindex = async (doc: any, bucket?: string): Promise<boolean> => {
     const targetBucket = bucket || (doc.file_type === 'pdf' ? 'manuals' : 'media');
     try {
       setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, indexing: true } : d));
@@ -181,8 +187,12 @@ export default function KnowledgeBasePage() {
           .single();
         if (updatedDoc) setSelectedDoc(updatedDoc);
       }
+      return true;
     } catch (error: any) {
       alert('Error de indexación: ' + error.message);
+      return false;
+    } finally {
+      setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, indexing: false } : d));
     }
   };
 
@@ -234,8 +244,14 @@ export default function KnowledgeBasePage() {
 
       if (dbError) throw dbError;
 
-      await handleReindex(docData, 'manuals');
-      alert('¡Gracias! Tu experiencia ha sido documentada y compartida con el equipo.');
+      const indexSuccess = await handleReindex(docData, 'manuals');
+      
+      if (indexSuccess) {
+        alert('¡Gracias! Tu experiencia ha sido documentada y compartida con el equipo.');
+      } else {
+        alert('Experiencia guardada, pero hubo un problema al procesarla con IA. Un administrador revisará la configuración.');
+      }
+      
       setExperienceForm({ brand: 'NCR', model: '', faultType: '', location: '', description: '', engineerName: '' });
       fetchDocuments();
     } catch (error: any) {

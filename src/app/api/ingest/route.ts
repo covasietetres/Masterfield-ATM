@@ -6,16 +6,20 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // ── Clientes ─────────────────────────────────────────────────────────────────
 // ── Clientes Lazy ────────────────────────────────────────────────────────────
 function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  if (!url || !key) return null;
-  return createClient(url, key);
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!url) return { error: 'Falta la variable NEXT_PUBLIC_SUPABASE_URL en el servidor.' };
+  if (!key) return { error: 'Falta la variable SUPABASE_SERVICE_ROLE_KEY en el servidor.' };
+  
+  return { client: createClient(url, key) };
 }
 
 function getGenAI() {
-  const key = process.env.GEMINI_API_KEY!;
-  if (!key) return null;
-  return new GoogleGenerativeAI(key);
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return { error: 'Falta la variable GEMINI_API_KEY en el servidor.' };
+  
+  return { client: new GoogleGenerativeAI(key) };
 }
 
 // ── Chunking: divide el texto en partes con overlap ──────────────────────────
@@ -31,12 +35,19 @@ function chunkText(text: string, chunkSize = 1000, overlap = 200): string[] {
 
 // ── POST /api/ingest ──────────────────────────────────────────────────────────
 export async function POST(request: Request) {
-  const supabase = getSupabase();
-  const genAI = getGenAI();
+  const supabaseResult = getSupabase();
+  const genAIResult = getGenAI();
 
-  if (!supabase || !genAI) {
-    return NextResponse.json({ error: 'Configuración de servidor incompleta (Variables de entorno).' }, { status: 500 });
+  if (supabaseResult.error || genAIResult.error) {
+    const errorMsg = supabaseResult.error || genAIResult.error;
+    console.error(`[INGEST] Error de configuración: ${errorMsg}`);
+    return NextResponse.json({ 
+      error: `Configuración de servidor incompleta: ${errorMsg}` 
+    }, { status: 500 });
   }
+
+  const supabase = supabaseResult.client!;
+  const genAI = genAIResult.client!;
 
   try {
     const { documentId, bucket, path, fileType } = await request.json();
