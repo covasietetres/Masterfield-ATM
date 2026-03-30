@@ -11,7 +11,8 @@ import {
   LogOut,
   Menu,
   X,
-  MessageSquare
+  MessageSquare,
+  Radio
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -40,6 +41,7 @@ export function Sidebar() {
   const navItems = [
     { name: 'Terminal', href: '/dashboard', icon: Home },
     { name: 'DOLA — Asistente', href: '/dashboard/chat', icon: MessageSquare },
+    { name: 'Frecuencia (En Vivo)', href: '/dashboard/team', icon: Radio },
     { name: 'Base de Conocimientos', href: '/dashboard/knowledge', icon: FileText },
     { name: 'Configuración', href: '/dashboard/settings', icon: Settings },
   ];
