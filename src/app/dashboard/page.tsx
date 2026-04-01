@@ -8,8 +8,8 @@ export default function DashboardPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       <header className="mb-8 border-b border-slate-800 pb-6">
-        <h1 className="text-3xl font-bold text-white tracking-wider uppercase flex items-center gap-3">
-          <Activity className="text-blue-500" />
+        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-wider uppercase flex items-center gap-3">
+          <Activity className="text-blue-500 w-6 h-6 md:w-8 md:h-8" />
           Terminal de Comando
         </h1>
         <p className="mt-2 text-slate-400 text-sm tracking-wide">

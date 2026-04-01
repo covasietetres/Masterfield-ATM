@@ -50,13 +50,14 @@ export function Sidebar() {
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="md:hidden fixed top-4 right-4 z-50 p-2 bg-slate-800 rounded-md text-slate-300 hover:text-white"
+        className="md:hidden fixed top-3 right-3 z-[60] p-2.5 bg-slate-800/95 backdrop-blur-sm border border-slate-700/80 rounded-xl text-slate-300 hover:text-white shadow-xl focus:outline-none"
+        aria-label="Toggle menu"
       >
-        {isOpen ? <X /> : <Menu />}
+        {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
 
       <div
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 border-r border-slate-800 transform transition-transform duration-300 ease-in-out flex flex-col ${
+        className={`fixed inset-y-0 left-0 z-[50] w-64 bg-slate-900 border-r border-slate-800 transform transition-transform duration-300 ease-in-out flex flex-col ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0`}
       >
@@ -107,7 +108,7 @@ export function Sidebar() {
       {/* Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-slate-950/80 z-30 md:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-slate-950/80 z-[40] md:hidden backdrop-blur-sm"
           onClick={() => setIsOpen(false)}
         />
       )}

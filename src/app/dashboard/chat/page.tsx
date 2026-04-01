@@ -217,7 +217,7 @@ export default function DolaPage() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div suppressHydrationWarning className="max-w-5xl mx-auto h-[calc(100vh-6rem)] flex flex-col">
+    <div suppressHydrationWarning className="max-w-5xl mx-auto h-[calc(100dvh-5rem)] md:h-[calc(100vh-6rem)] flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
@@ -377,7 +377,7 @@ export default function DolaPage() {
             </div>
           )}
 
-          <div className="flex items-end gap-3">
+          <div className="flex items-end gap-2 md:gap-3">
             {/* Mic Button */}
             <button
               suppressHydrationWarning

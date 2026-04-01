@@ -233,12 +233,12 @@ export default function TeamChatPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto flex flex-col h-[calc(100vh-6rem)]">
+    <div className="max-w-5xl mx-auto flex flex-col h-[calc(100dvh-5rem)] md:h-[calc(100vh-6rem)]">
       <header className="mb-6 border-b border-slate-800 pb-4 shrink-0">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-wider uppercase flex items-center gap-3">
-              <Radio className={`w-8 h-8 ${isConnected ? 'text-blue-400 animate-pulse' : 'text-slate-500'}`} />
+            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-wider uppercase flex items-center gap-2 md:gap-3">
+              <Radio className={`w-6 h-6 md:w-8 md:h-8 shrink-0 ${isConnected ? 'text-blue-400 animate-pulse' : 'text-slate-500'}`} />
               Frecuencia de Ingenieros
             </h1>
             <p className="mt-2 text-slate-400 text-sm tracking-wide flex items-center gap-2">
@@ -246,8 +246,7 @@ export default function TeamChatPage() {
               Canal táctico efímero con soporte para transmisiones cifradas (privadas).
             </p>
           </div>
-          
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-start gap-2 w-full md:w-auto mt-2 md:mt-0">
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider ${
               isConnected 
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
