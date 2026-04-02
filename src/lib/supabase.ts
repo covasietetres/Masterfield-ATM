@@ -19,13 +19,13 @@ const isConfigured = !!(
 export const supabase = new Proxy({} as any, {
   get(target, prop) {
     if (!isConfigured) {
-      if (typeof window !== 'undefined') {
-        console.warn(`Supabase is not configured. Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in environment.`);
-      }
+      const missingVars = [];
+      if (!supabaseUrl || supabaseUrl === 'undefined' || supabaseUrl === 'null') missingVars.push('NEXT_PUBLIC_SUPABASE_URL');
+      if (!supabaseAnonKey || supabaseAnonKey === 'undefined' || supabaseAnonKey === 'null') missingVars.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
       
       const errorResponse = { 
         data: { user: null, session: null }, 
-        error: { message: 'Configuración de Supabase incompleta. Verifica las variables de entorno en Vercel.' } 
+        error: { message: `Configuración de Supabase incompleta. Faltan: ${missingVars.join(', ')}. Verifica Vercel Settings > Env Vars.` } 
       };
 
       if (prop === 'auth') {
@@ -33,14 +33,11 @@ export const supabase = new Proxy({} as any, {
           get(_, authProp) {
             if (authProp === 'getUser') return async () => ({ data: { user: null }, error: null });
             if (authProp === 'onAuthStateChange') return () => ({ data: { subscription: { unsubscribe: () => {} } } });
-            
-            // For any other auth method (signInWithPassword, signUp, etc.)
             return async () => errorResponse;
           }
         });
       }
       
-      // Catch-all for other top-level properties (from, rpc, etc.)
       return () => ({
         select: () => ({ error: errorResponse.error }),
         insert: () => ({ error: errorResponse.error }),
