@@ -23,10 +23,10 @@ export const supabase = new Proxy({} as any, {
         console.warn(`Supabase is not configured. Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in environment.`);
       }
       
-      const errorResponse = { 
-        data: { user: null, session: null }, 
-        error: { message: 'Configuración de Supabase incompleta. Verifica las variables de entorno en Vercel.' } 
-      };
+        const errorResponse = { 
+          data: { user: null, session: null }, 
+          error: { message: 'Configuración de Supabase incompleta (Deploy 2). Verifica las variables de entorno en Vercel.' } 
+        };
 
       if (prop === 'auth') {
         return new Proxy({}, {
