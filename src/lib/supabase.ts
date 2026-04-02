@@ -15,7 +15,7 @@ const isConfigured = !!(
 );
 
 // Lazy initialization using a Proxy to prevent ANY call to createBrowserClient during builds/prerendering
-// We cast to SupabaseClient to satisfy TypeScript's type checking in other files
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const supabase = new Proxy({} as any, {
   get(target, prop) {
     if (!isConfigured) {
@@ -23,10 +23,10 @@ export const supabase = new Proxy({} as any, {
         console.warn(`Supabase is not configured. Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in environment.`);
       }
       
-        const errorResponse = { 
-          data: { user: null, session: null }, 
-          error: { message: 'Configuración de Supabase incompleta (Deploy 2). Verifica las variables de entorno en Vercel.' } 
-        };
+      const errorResponse = { 
+        data: { user: null, session: null }, 
+        error: { message: 'Configuración de Supabase incompleta. Verifica las variables de entorno en Vercel.' } 
+      };
 
       if (prop === 'auth') {
         return new Proxy({}, {

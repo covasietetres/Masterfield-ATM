@@ -8,12 +8,25 @@ import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { jsPDF } from 'jspdf';
 
+interface KnowledgeDocument {
+  id: string;
+  title: string;
+  file_type: 'pdf' | 'image' | 'video';
+  brand: string;
+  storage_path: string;
+  uploaded_by: string;
+  created_at: string;
+  content_text?: string;
+  knowledge_chunks?: { count: number }[];
+  indexing?: boolean;
+}
+
 export default function KnowledgeBasePage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
+  const [selectedDoc, setSelectedDoc] = useState<KnowledgeDocument | null>(null);
 
   // OCR Reading Mode
   const [ocrMode, setOcrMode] = useState(false);
@@ -155,7 +168,7 @@ export default function KnowledgeBasePage() {
     }
   };
 
-  const handleReindex = async (doc: any, bucket?: string): Promise<boolean> => {
+  const handleReindex = async (doc: KnowledgeDocument, bucket?: string): Promise<boolean> => {
     const targetBucket = bucket || (doc.file_type === 'pdf' ? 'manuals' : 'media');
     try {
       setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, indexing: true } : d));
@@ -261,13 +274,13 @@ export default function KnowledgeBasePage() {
     }
   };
 
-  const getPublicUrl = (doc: any) => {
+  const getPublicUrl = (doc: KnowledgeDocument) => {
     const bucket = doc.file_type === 'pdf' ? 'manuals' : 'media';
     const { data } = supabase.storage.from(bucket).getPublicUrl(doc.storage_path);
     return data.publicUrl;
   };
 
-  const handleDelete = async (doc: any) => {
+  const handleDelete = async (doc: KnowledgeDocument) => {
     if (!window.confirm(`¿Eliminar permanentemente "${doc.title}"?`)) return;
 
     try {
@@ -483,18 +496,18 @@ export default function KnowledgeBasePage() {
                 <div suppressHydrationWarning className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                   {/* OCR Buttons - show if content_text exists */}
                   {selectedDoc.content_text && (
-                      <button
-                        suppressHydrationWarning
-                        onClick={() => isSpeaking ? stopSpeaking() : speakOCR(selectedDoc.content_text)}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
-                          isSpeaking
-                            ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30'
-                            : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
-                        }`}
-                      >
-                        {isSpeaking ? <VolumeX className="w-4 h-4 shrink-0" /> : <Volume2 className="w-4 h-4 shrink-0" />}
-                        <span suppressHydrationWarning className="truncate">{isSpeaking ? 'Detener Lectura' : 'Lectura Inteligente'}</span>
-                      </button>
+                    <button
+                      suppressHydrationWarning
+                      onClick={() => isSpeaking ? stopSpeaking() : speakOCR(selectedDoc.content_text || '')}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
+                        isSpeaking
+                          ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30'
+                          : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
+                      }`}
+                    >
+                      {isSpeaking ? <VolumeX className="w-4 h-4 shrink-0" /> : <Volume2 className="w-4 h-4 shrink-0" />}
+                      <span suppressHydrationWarning className="truncate">{isSpeaking ? 'Detener Lectura' : 'Lectura Inteligente'}</span>
+                    </button>
                   )}
 
                   {/* Close button for DESKTOP */}
@@ -546,7 +559,7 @@ export default function KnowledgeBasePage() {
                       </div>
                       <button
                         suppressHydrationWarning
-                        onClick={() => isSpeaking ? stopSpeaking() : speakOCR(selectedDoc.content_text)}
+                        onClick={() => isSpeaking ? stopSpeaking() : speakOCR(selectedDoc.content_text || '')}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border ${
                           isSpeaking
                             ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30'
