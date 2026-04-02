@@ -400,13 +400,13 @@ export default function KnowledgeBasePage() {
               <p className="text-slate-500 text-sm text-center py-8 italic">Núcleo de memoria vacío. Esperando registros.</p>
             ) : (
               documents.map((doc) => (
-                <div key={doc.id} className="p-4 bg-slate-950 border border-slate-800 rounded-lg flex items-start gap-4 hover:border-slate-700 transition-all group">
-                  <div className={`p-3 rounded-lg ${doc.file_type === 'pdf' ? 'bg-blue-500/10' : 'bg-amber-500/10'}`}>
+                <div key={doc.id} className="p-4 bg-slate-950 border border-slate-800 rounded-lg flex flex-wrap sm:flex-nowrap items-start gap-4 hover:border-slate-700 transition-all group">
+                  <div className={`p-3 rounded-lg flex-shrink-0 ${doc.file_type === 'pdf' ? 'bg-blue-500/10' : 'bg-amber-500/10'}`}>
                     <FileText className={`w-6 h-6 ${doc.file_type === 'pdf' ? 'text-blue-400' : 'text-amber-500'}`} />
                   </div>
-                  <div className="overflow-hidden flex-1">
+                  <div className="overflow-hidden flex-1 min-w-[200px] w-full sm:w-auto">
                     <h4 className="text-sm font-bold text-slate-100 truncate pr-4 uppercase tracking-tight">{doc.title}</h4>
-                    <div className="flex flex-wrap items-center gap-3 mt-2">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2">
                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full uppercase font-black tracking-tighter shadow-sm ${
                         (doc.knowledge_chunks?.[0]?.count || 0) > 0
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
@@ -414,20 +414,20 @@ export default function KnowledgeBasePage() {
                       }`}>
                         {(doc.knowledge_chunks?.[0]?.count || 0) > 0 ? 'Indexado' : 'Procesando'}
                       </span>
-                      <p className="text-[10px] text-slate-500 font-medium">
-                        {doc.knowledge_chunks?.[0]?.count || 0} fragmentos  •  Por: <span className="text-slate-300">{doc.uploaded_by}</span>
+                      <p className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                        {doc.knowledge_chunks?.[0]?.count || 0} frag. • Por: <span className="text-slate-300 truncate max-w-[80px] sm:max-w-[120px] inline-block align-bottom">{doc.uploaded_by}</span>
                       </p>
-                      <span className="text-[10px] text-slate-600 ml-auto">{new Date(doc.created_at).toLocaleDateString()}</span>
+                      <span className="text-[10px] text-slate-600 sm:ml-auto">{new Date(doc.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
-                    <button onClick={() => handleReindex(doc)} disabled={doc.indexing} className={`p-2 rounded-lg text-slate-300 hover:text-white transition-all shadow-lg ${doc.indexing ? 'bg-blue-600 animate-pulse' : 'bg-slate-800 hover:bg-emerald-600'}`} title="Forzar Re-indexado IA">
+                  <div className="flex gap-2 w-full sm:w-auto justify-end opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all sm:translate-x-4 group-hover:translate-x-0 mt-1 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-slate-800/50">
+                    <button onClick={() => handleReindex(doc)} disabled={doc.indexing} className={`flex-1 sm:flex-none flex justify-center p-2 rounded-lg text-slate-300 hover:text-white transition-all shadow-lg ${doc.indexing ? 'bg-blue-600 animate-pulse' : 'bg-slate-800 hover:bg-emerald-600'}`} title="Forzar Re-indexado IA">
                       <RotateCcw className={`w-4 h-4 ${doc.indexing ? 'animate-spin' : ''}`} />
                     </button>
-                    <button onClick={() => setSelectedDoc(doc)} className="p-2 bg-slate-800 hover:bg-blue-600 rounded-lg text-slate-300 hover:text-white transition-all shadow-lg" title="Ver">
+                    <button onClick={() => setSelectedDoc(doc)} className="flex-1 sm:flex-none flex justify-center p-2 bg-slate-800 hover:bg-blue-600 rounded-lg text-slate-300 hover:text-white transition-all shadow-lg" title="Ver">
                       <Eye className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleDelete(doc)} className="p-2 bg-slate-800 hover:bg-rose-600 rounded-lg text-slate-300 hover:text-white transition-all shadow-lg" title="Eliminar">
+                    <button onClick={() => handleDelete(doc)} className="flex-1 sm:flex-none flex justify-center p-2 bg-slate-800 hover:bg-rose-600 rounded-lg text-slate-300 hover:text-white transition-all shadow-lg" title="Eliminar">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
