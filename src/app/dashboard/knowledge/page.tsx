@@ -531,12 +531,12 @@ export default function KnowledgeBasePage() {
                   {selectedDoc.file_type === 'pdf' ? (
                     <iframe
                       suppressHydrationWarning
-                      src={`${getPublicUrl(selectedDoc)}#toolbar=0`}
+                      src={`https://docs.google.com/viewer?url=${encodeURIComponent(getPublicUrl(selectedDoc))}&embedded=true`}
                       className="w-full h-full border-none"
                       title={selectedDoc.title}
                     />
                   ) : selectedDoc.file_type === 'image' ? (
-                    <div suppressHydrationWarning className="w-full h-full flex items-center justify-center p-8">
+                    <div suppressHydrationWarning className="w-full h-full flex items-center justify-center p-8 overflow-auto">
                       <img suppressHydrationWarning src={getPublicUrl(selectedDoc)} alt={selectedDoc.title} className="max-w-full max-h-full object-contain rounded-lg shadow-xl" />
                     </div>
                   ) : selectedDoc.file_type === 'video' ? (
