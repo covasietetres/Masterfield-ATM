@@ -458,53 +458,65 @@ export default function KnowledgeBasePage() {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950 flex-shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-500/10 p-2 rounded">
-                    <FileText className="w-5 h-5 text-blue-400" />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 border-b border-slate-800 bg-slate-950 flex-shrink-0 gap-3">
+                <div className="flex items-start justify-between w-full sm:w-auto gap-4">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="bg-blue-500/10 p-2 rounded shrink-0">
+                      <FileText className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <div className="overflow-hidden">
+                      <h3 className="text-white font-bold text-sm truncate max-w-[200px] sm:max-w-md">{selectedDoc.title}</h3>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wider">Documento {selectedDoc.file_type}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-white font-bold text-sm truncate max-w-md">{selectedDoc.title}</h3>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider">Documento {selectedDoc.file_type}</p>
-                  </div>
+                  
+                  {/* Close button for MOBILE */}
+                  <button
+                    suppressHydrationWarning
+                    onClick={() => { setSelectedDoc(null); setOcrMode(false); stopSpeaking(); }}
+                    className="sm:hidden p-1 -mr-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors shrink-0"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
                 </div>
 
-                <div suppressHydrationWarning className="flex items-center gap-2">
+                <div suppressHydrationWarning className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                   {/* OCR Buttons - show if content_text exists */}
                   {selectedDoc.content_text && (
                     <>
                       <button
                         suppressHydrationWarning
                         onClick={() => isSpeaking ? stopSpeaking() : speakOCR(selectedDoc.content_text)}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border ${
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
                           isSpeaking
                             ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30'
                             : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
                         }`}
                       >
-                        {isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                        <span suppressHydrationWarning>{isSpeaking ? 'Detener Lectura' : 'Lectura Inteligente'}</span>
+                        {isSpeaking ? <VolumeX className="w-4 h-4 shrink-0" /> : <Volume2 className="w-4 h-4 shrink-0" />}
+                        <span suppressHydrationWarning className="truncate">{isSpeaking ? 'Detener Lectura' : 'Lectura Inteligente'}</span>
                       </button>
 
                       <button
                         suppressHydrationWarning
                         onClick={() => { setOcrMode(!ocrMode); if (ocrMode) stopSpeaking(); }}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border ${
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
                           ocrMode
                             ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
                             : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-amber-500/20 hover:text-amber-400 hover:border-amber-500/40'
                         }`}
                       >
-                        <BookOpen className="w-4 h-4" />
-                        <span suppressHydrationWarning>{ocrMode ? 'Cerrar OCR' : 'Ver Texto OCR'}</span>
+                        <BookOpen className="w-4 h-4 shrink-0" />
+                        <span suppressHydrationWarning className="truncate">{ocrMode ? 'Cerrar OCR' : 'Ver Texto OCR'}</span>
                       </button>
                     </>
                   )}
 
+                  {/* Close button for DESKTOP */}
                   <button
                     suppressHydrationWarning
                     onClick={() => { setSelectedDoc(null); setOcrMode(false); stopSpeaking(); }}
-                    className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                    className="hidden sm:block p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors shrink-0 ml-auto"
                   >
                     <X className="w-6 h-6" />
                   </button>
