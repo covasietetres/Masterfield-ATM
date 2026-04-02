@@ -81,6 +81,7 @@ export function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={() => setIsOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-sm uppercase tracking-wide font-medium ${
                   isActive
                     ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'

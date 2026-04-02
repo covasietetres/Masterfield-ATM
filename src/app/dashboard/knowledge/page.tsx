@@ -483,7 +483,6 @@ export default function KnowledgeBasePage() {
                 <div suppressHydrationWarning className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                   {/* OCR Buttons - show if content_text exists */}
                   {selectedDoc.content_text && (
-                    <>
                       <button
                         suppressHydrationWarning
                         onClick={() => isSpeaking ? stopSpeaking() : speakOCR(selectedDoc.content_text)}
@@ -496,20 +495,6 @@ export default function KnowledgeBasePage() {
                         {isSpeaking ? <VolumeX className="w-4 h-4 shrink-0" /> : <Volume2 className="w-4 h-4 shrink-0" />}
                         <span suppressHydrationWarning className="truncate">{isSpeaking ? 'Detener Lectura' : 'Lectura Inteligente'}</span>
                       </button>
-
-                      <button
-                        suppressHydrationWarning
-                        onClick={() => { setOcrMode(!ocrMode); if (ocrMode) stopSpeaking(); }}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
-                          ocrMode
-                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-amber-500/20 hover:text-amber-400 hover:border-amber-500/40'
-                        }`}
-                      >
-                        <BookOpen className="w-4 h-4 shrink-0" />
-                        <span suppressHydrationWarning className="truncate">{ocrMode ? 'Cerrar OCR' : 'Ver Texto OCR'}</span>
-                      </button>
-                    </>
                   )}
 
                   {/* Close button for DESKTOP */}
