@@ -33,8 +33,10 @@ export default async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protect the dashboard routes
-  if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
+  // Protect the dashboard routes (Allow /dashboard/debug to be accessed for diagnostics)
+  if (request.nextUrl.pathname.startsWith('/dashboard') && 
+      request.nextUrl.pathname !== '/dashboard/debug' && 
+      !user) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
