@@ -13,7 +13,9 @@ import {
   X, 
   Loader2, 
   Bot, 
-  MessageSquare
+  MessageSquare,
+  AlignLeft,
+  BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
@@ -262,6 +264,16 @@ export default function ConsultaPage() {
 
                 <div suppressHydrationWarning className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                   <button
+                    onClick={() => setOcrMode(!ocrMode)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
+                      ocrMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    <AlignLeft className="w-4 h-4" />
+                    {ocrMode ? 'Ocultar OCR' : 'Ver OCR'}
+                  </button>
+
+                  <button
                     suppressHydrationWarning
                     onClick={() => isSpeakingOCR ? stopSpeaking() : speakOCR(selectedDoc.content_text || '')}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
@@ -286,7 +298,7 @@ export default function ConsultaPage() {
 
               {/* Modal Body */}
               <div className="flex-1 flex overflow-hidden">
-                <div className="w-full h-full bg-slate-950 relative overflow-hidden">
+                <div className={`transition-all duration-300 bg-slate-950 relative overflow-hidden ${ocrMode ? 'w-1/2' : 'w-full'}`}>
                   {selectedDoc.file_type === 'pdf' ? (
                     <iframe
                       suppressHydrationWarning
@@ -308,6 +320,29 @@ export default function ConsultaPage() {
                     </div>
                   )}
                 </div>
+
+                {ocrMode && (
+                  <div className="w-1/2 border-l border-slate-800 flex flex-col bg-slate-950">
+                    <div className="flex items-center justify-between p-3 border-b border-slate-800 bg-slate-900 flex-shrink-0">
+                      <div className="flex items-center gap-2">
+                        <AlignLeft className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs font-black text-amber-400 uppercase tracking-widest">Texto Extraído (OCR)</span>
+                      </div>
+                    </div>
+                    <div ref={ocrTextRef} className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                      {selectedDoc.content_text ? (
+                        <p className="text-slate-300 text-xs leading-7 whitespace-pre-wrap font-mono tracking-wide">
+                          {selectedDoc.content_text}
+                        </p>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-center gap-4">
+                          <BookOpen className="w-10 h-10 text-slate-700" />
+                          <p className="text-slate-500 text-xs font-bold uppercase">Sin texto extraído</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Footer */}
