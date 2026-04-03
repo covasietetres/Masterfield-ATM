@@ -70,7 +70,36 @@ export async function POST(request: Request) {
       }
     });
 
-    return NextResponse.json({ sources: Array.from(uniqueDocs.values()) });
+    const finalDocs = Array.from(uniqueDocs.values());
+
+    // 3. RECONSTRUCCIÓN AVANZADA: Si el texto completo es nulo o muy corto, reconstruir desde chunks
+    console.log(`[CONSULTA] Procesando ${finalDocs.length} documentos únicos...`);
+    
+    for (const doc of finalDocs) {
+      const hasText = doc.content_text && doc.content_text.trim().length > 100;
+      
+      if (!hasText) {
+        console.log(`[CONSULTA] Documento "${doc.title}" sin texto completo. Intentando reconstruir...`);
+        const { data: allChunks, error: recError } = await supabase
+          .from('knowledge_chunks')
+          .select('content')
+          .eq('document_id', doc.id);
+        
+        if (recError) {
+          console.error(`[CONSULTA] Error recuperando chunks para ${doc.id}:`, recError);
+          continue;
+        }
+
+        if (allChunks && allChunks.length > 0) {
+          console.log(`[CONSULTA] Reconstruidos ${allChunks.length} fragmentos para "${doc.title}"`);
+          doc.content_text = allChunks.map((ch: any) => ch.content).join('\n\n');
+        } else {
+          console.warn(`[CONSULTA] No se encontraron fragmentos (chunks) para el documento ${doc.id}`);
+        }
+      }
+    }
+
+    return NextResponse.json({ sources: finalDocs });
 
   } catch (error: any) {
     console.error('[CONSULTA] Error:', error);
