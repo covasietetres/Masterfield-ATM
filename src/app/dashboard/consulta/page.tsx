@@ -13,9 +13,7 @@ import {
   X, 
   Loader2, 
   Bot, 
-  MessageSquare,
-  AlignLeft,
-  BookOpen
+  MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
