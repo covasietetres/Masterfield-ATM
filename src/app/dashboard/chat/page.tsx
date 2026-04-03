@@ -3,17 +3,29 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Mic, MicOff, Paperclip, X, Volume2, VolumeX, Zap, Database, ImagePlus, Loader2, Bot } from 'lucide-react';
+import { Send, Mic, MicOff, Paperclip, X, Volume2, VolumeX, Zap, Database, ImagePlus, Loader2, Bot, Eye, AlignLeft, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 
 // ── Types ──────────────────────────────────────────────────────────────────
+interface KnowledgeDocument {
+  id: string;
+  title: string;
+  file_type: 'pdf' | 'image' | 'video';
+  brand: string;
+  storage_path: string;
+  uploaded_by: string;
+  created_at: string;
+  content_text?: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'dola';
   text: string;
   imagePreview?: string;
   usedManuals?: boolean;
+  sources?: KnowledgeDocument[];
   timestamp: Date;
 }
 
@@ -36,10 +48,16 @@ export default function DolaPage() {
   const [mounted, setMounted] = useState(false);
   const [engineerId, setEngineerId] = useState<string | null>(null);
 
+  // Document Viewer State
+  const [selectedDoc, setSelectedDoc] = useState<KnowledgeDocument | null>(null);
+  const [ocrMode, setOcrMode] = useState(false);
+  const [isSpeakingOCR, setIsSpeakingOCR] = useState(false);
+
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const recognitionRef = useRef<any>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const ocrTextRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -82,6 +100,36 @@ export default function DolaPage() {
     utterance.onerror = () => setIsSpeaking(false);
     synthRef.current.speak(utterance);
   }, [stopSpeaking]);
+
+  const speakOCR = useCallback((text: string) => {
+    if (!synthRef.current || !text) return;
+    stopSpeaking();
+
+    const cleanText = text
+      .replace(/[*#_`|\\]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!cleanText) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'es-ES';
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    utterance.onstart = () => setIsSpeakingOCR(true);
+    utterance.onend = () => setIsSpeakingOCR(false);
+    utterance.onerror = () => setIsSpeakingOCR(false);
+
+    synthRef.current.speak(utterance);
+  }, [stopSpeaking]);
+
+  const getPublicUrl = (doc: KnowledgeDocument) => {
+    const bucket = doc.file_type === 'pdf' ? 'manuals' : 'media';
+    const { data } = supabase.storage.from(bucket).getPublicUrl(doc.storage_path);
+    return data.publicUrl;
+  };
 
   // ── Microphone ────────────────────────────────────────────────────────────
   const toggleMic = useCallback(() => {
@@ -187,6 +235,7 @@ export default function DolaPage() {
         role: 'dola',
         text: data.response,
         usedManuals: data.usedManuals,
+        sources: data.sources,
         timestamp: new Date(),
       };
 
@@ -333,6 +382,53 @@ export default function DolaPage() {
                         </div>
                       )}
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                      
+                      {/* Sources / Documents found */}
+                      {msg.role === 'dola' && msg.sources && msg.sources.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-slate-700/50 space-y-3">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                            <Database className="w-3 h-3" /> Documentos Encontrados
+                          </p>
+                          <div className="grid grid-cols-1 gap-2">
+                            {msg.sources.map((doc) => (
+                              <div key={doc.id} className="flex items-center justify-between p-2 bg-slate-900/50 border border-slate-700/30 rounded-xl hover:border-violet-500/30 transition-all group">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                  <div className="p-1.5 rounded-lg bg-violet-600/10 text-violet-400">
+                                    <Database className="w-3.5 h-3.5" />
+                                  </div>
+                                  <span className="text-xs text-slate-300 truncate max-w-[140px] uppercase font-bold tracking-tight">
+                                    {doc.title}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => setSelectedDoc(doc)}
+                                    className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-violet-600 transition-all"
+                                    title="Ver Documento"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (doc.content_text) {
+                                        isSpeakingOCR ? stopSpeaking() : speakOCR(doc.content_text);
+                                      } else {
+                                        alert("Este documento aún no ha sido procesado para lectura inteligente.");
+                                      }
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-all ${
+                                      isSpeakingOCR ? 'bg-red-500/20 text-red-400' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-emerald-600'
+                                    }`}
+                                    title="Lectura Inteligente"
+                                  >
+                                    <Volume2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -436,6 +532,149 @@ export default function DolaPage() {
           </div>
         </div>
       </div>
+
+      {/* === DOCUMENT VIEWER MODAL === */}
+      <AnimatePresence>
+        {mounted && selectedDoc && (
+          <motion.div
+            key="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            suppressHydrationWarning
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            onClick={() => { setSelectedDoc(null); setOcrMode(false); stopSpeaking(); }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-900 border border-slate-700 w-full max-w-6xl h-[90vh] rounded-2xl overflow-hidden flex flex-col shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 border-b border-slate-800 bg-slate-950 flex-shrink-0 gap-3">
+                <div className="flex items-start justify-between w-full sm:w-auto gap-4">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="bg-violet-500/10 p-2 rounded shrink-0">
+                      <Database className="w-5 h-5 text-violet-400" />
+                    </div>
+                    <div className="overflow-hidden">
+                      <h3 className="text-white font-bold text-sm truncate max-w-[200px] sm:max-w-md uppercase tracking-tight">{selectedDoc.title}</h3>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wider">Documento {selectedDoc.file_type} · {selectedDoc.brand}</p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    suppressHydrationWarning
+                    onClick={() => { setSelectedDoc(null); setOcrMode(false); stopSpeaking(); }}
+                    className="sm:hidden p-1 -mr-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors shrink-0"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div suppressHydrationWarning className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                  <button
+                    onClick={() => setOcrMode(!ocrMode)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
+                      ocrMode ? 'bg-violet-600 text-white border-violet-500' : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                    }`}
+                  >
+                    <AlignLeft className="w-4 h-4" />
+                    {ocrMode ? 'Ocultar OCR' : 'Ver OCR'}
+                  </button>
+
+                  <button
+                    suppressHydrationWarning
+                    onClick={() => isSpeakingOCR ? stopSpeaking() : speakOCR(selectedDoc.content_text || '')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
+                      isSpeakingOCR
+                        ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30'
+                        : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
+                    }`}
+                  >
+                    {isSpeakingOCR ? <VolumeX className="w-4 h-4 shrink-0" /> : <Volume2 className="w-4 h-4 shrink-0" />}
+                    <span suppressHydrationWarning className="truncate">{isSpeakingOCR ? 'Detener Lectura' : 'Lectura Inteligente'}</span>
+                  </button>
+
+                  <button
+                    suppressHydrationWarning
+                    onClick={() => { setSelectedDoc(null); setOcrMode(false); stopSpeaking(); }}
+                    className="hidden sm:block p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors shrink-0 ml-auto"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 flex overflow-hidden">
+                <div className={`transition-all duration-300 bg-slate-950 relative overflow-hidden ${ocrMode ? 'w-1/2' : 'w-full'}`}>
+                  {selectedDoc.file_type === 'pdf' ? (
+                    <iframe
+                      suppressHydrationWarning
+                      src={`https://docs.google.com/viewer?url=${encodeURIComponent(getPublicUrl(selectedDoc))}&embedded=true`}
+                      className="w-full h-full border-none"
+                      title={selectedDoc.title}
+                    />
+                  ) : selectedDoc.file_type === 'image' ? (
+                    <div suppressHydrationWarning className="w-full h-full flex items-center justify-center p-8 overflow-auto">
+                      <img suppressHydrationWarning src={getPublicUrl(selectedDoc)} alt={selectedDoc.title} className="max-w-full max-h-full object-contain rounded-lg shadow-xl" />
+                    </div>
+                  ) : selectedDoc.file_type === 'video' ? (
+                    <div suppressHydrationWarning className="w-full h-full flex items-center justify-center p-4">
+                      <video suppressHydrationWarning src={getPublicUrl(selectedDoc)} controls className="max-w-full max-h-full rounded-lg shadow-xl" />
+                    </div>
+                  ) : (
+                    <div suppressHydrationWarning className="w-full h-full flex items-center justify-center text-slate-500">
+                      Visor no disponible.
+                    </div>
+                  )}
+                </div>
+
+                {ocrMode && (
+                  <div className="w-1/2 border-l border-slate-800 flex flex-col bg-slate-950">
+                    <div className="flex items-center justify-between p-3 border-b border-slate-800 bg-slate-900 flex-shrink-0">
+                      <div className="flex items-center gap-2">
+                        <AlignLeft className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs font-black text-amber-400 uppercase tracking-widest">Texto Extraído (OCR)</span>
+                      </div>
+                    </div>
+                    <div ref={ocrTextRef} className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                      {selectedDoc.content_text ? (
+                        <p className="text-slate-300 text-xs leading-7 whitespace-pre-wrap font-mono tracking-wide">
+                          {selectedDoc.content_text}
+                        </p>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-center gap-4">
+                          <BookOpen className="w-10 h-10 text-slate-700" />
+                          <p className="text-slate-500 text-xs font-bold uppercase">Sin texto extraído</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-3 border-t border-slate-800 bg-slate-950 flex justify-between items-center flex-shrink-0">
+                <div className="text-[10px] text-slate-600 font-mono">
+                  ID: {selectedDoc.id.substring(0, 8)}...
+                </div>
+                <a
+                  href={getPublicUrl(selectedDoc)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-widest flex items-center gap-2"
+                >
+                  Abrir original
+                </a>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

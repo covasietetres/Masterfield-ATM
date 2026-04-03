@@ -56,9 +56,10 @@ export async function POST(request: Request) {
             .map((k: string) => `content.ilike.%${k}%`)
             .join(',');
 
+          // Seleccionar contenido y metadatos del documento
           const { data: chunks } = await supabase
             .from('knowledge_chunks')
-            .select('content')
+            .select('content, document_id, knowledge_documents(*)')
             .or(orFilters)
             .limit(8);
 
@@ -67,6 +68,19 @@ export async function POST(request: Request) {
               .map((c: any) => `[MANUAL]: ${c.content}`)
               .join('\n---\n');
             usedManuals = true;
+
+            // Extraer documentos únicos encontrados
+            const uniqueDocs = new Map();
+            chunks.forEach((c: any) => {
+              if (c.knowledge_documents && !uniqueDocs.has(c.document_id)) {
+                uniqueDocs.set(c.document_id, {
+                  ...c.knowledge_documents,
+                  // Asegurar que content_text esté disponible para lectura inteligente si es necesario
+                  // Aunque usualmente se saca de la tabla knowledge_documents
+                });
+              }
+            });
+            body.sources = Array.from(uniqueDocs.values());
           }
         }
       } catch (searchErr: any) {
@@ -121,7 +135,11 @@ REGLAS ABSOLUTAS:
       console.warn('[DOLA] No se pudo guardar en historial:', histErr.message);
     }
 
-    return NextResponse.json({ response: aiResponse, usedManuals });
+    return NextResponse.json({ 
+      response: aiResponse, 
+      usedManuals,
+      sources: body.sources || [] 
+    });
 
   } catch (error: any) {
     console.error('[DOLA] Error en chat-multimodal:', error);
