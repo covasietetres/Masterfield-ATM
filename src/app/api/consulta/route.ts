@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
     const keywords = query
       .split(/\s+/)
-      .filter((w: string) => w.length > 3)
+      .filter((w: string) => w.length >= 2) // Admitir palabras como 'ODS'
       .slice(0, 5);
 
     if (keywords.length === 0) {
@@ -34,18 +34,39 @@ export async function POST(request: Request) {
       .map((k: string) => `content.ilike.%${k}%`)
       .join(',');
 
-    const { data: chunks, error } = await supabase
+    const titleFilters = keywords
+      .map((k: string) => `title.ilike.%${k}%`)
+      .join(',');
+
+    // 1. Buscar en fragmentos (chunks)
+    const { data: chunks, error: chunksError } = await supabase
       .from('knowledge_chunks')
       .select('document_id, knowledge_documents(*)')
       .or(orFilters)
       .limit(20);
 
-    if (error) throw error;
+    // 2. Buscar por título (documentos directos)
+    const { data: docsByTitle, error: docsError } = await supabase
+      .from('knowledge_documents')
+      .select('*')
+      .or(titleFilters)
+      .limit(10);
+
+    if (chunksError || docsError) throw (chunksError || docsError);
 
     const uniqueDocs = new Map();
+
+    // Agregar documentos encontrados por fragmento
     chunks?.forEach((c: any) => {
       if (c.knowledge_documents && !uniqueDocs.has(c.document_id)) {
         uniqueDocs.set(c.document_id, c.knowledge_documents);
+      }
+    });
+
+    // Agregar documentos encontrados por título
+    docsByTitle?.forEach((doc: any) => {
+      if (!uniqueDocs.has(doc.id)) {
+        uniqueDocs.set(doc.id, doc);
       }
     });
 
