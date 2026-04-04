@@ -9,6 +9,8 @@ interface PresenceContextType {
   isConnected: boolean;
   channel: RealtimeChannel | null;
   userEmail: string;
+  incomingCall: { senderName: string; offer: any } | null;
+  setIncomingCall: (call: { senderName: string; offer: any } | null) => void;
 }
 
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
@@ -17,6 +19,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [userEmail, setUserEmail] = useState<string>('Ingeniero');
+  const [incomingCall, setIncomingCall] = useState<{ senderName: string; offer: any } | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
@@ -44,6 +47,14 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         const p = payload.payload;
         if (p.targetUser === 'ALL' || p.targetUser === shortName) {
            playBipperSound();
+        }
+      });
+
+      // Signaling for calls
+      activeChannel.on('broadcast', { event: 'call_offer' }, (payload) => {
+        const p = payload.payload;
+        if (p.targetUser === shortName) {
+           setIncomingCall({ senderName: p.senderName, offer: p.offer });
         }
       });
 
@@ -101,7 +112,14 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <PresenceContext.Provider value={{ onlineUsers, isConnected, channel: channelRef.current, userEmail }}>
+    <PresenceContext.Provider value={{ 
+      onlineUsers, 
+      isConnected, 
+      channel: channelRef.current, 
+      userEmail,
+      incomingCall,
+      setIncomingCall
+    }}>
       {children}
     </PresenceContext.Provider>
   );

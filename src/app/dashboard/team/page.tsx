@@ -4,8 +4,9 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Radio, Send, ShieldAlert, Users, Zap, Mic, Square, Lock, Bell } from 'lucide-react';
+import { Radio, Send, ShieldAlert, Users, Zap, Mic, Square, Lock, Bell, Phone, PhoneOff, PhoneIncoming, Volume2 } from 'lucide-react';
 import { usePresence } from '@/contexts/PresenceContext';
+import { useWebRTC } from '@/hooks/useWebRTC';
 
 interface ChatMessage {
   id: string;
@@ -19,7 +20,20 @@ interface ChatMessage {
 }
 
 export default function TeamChatPage() {
-  const { onlineUsers, isConnected, channel, userEmail } = usePresence();
+  const { onlineUsers, isConnected, channel, userEmail, incomingCall, setIncomingCall } = usePresence();
+  
+  const {
+    callStatus,
+    currentPeer,
+    makeCall,
+    acceptCall,
+    hangUp,
+    handleOffer,
+    handleAnswer,
+    handleCandidate,
+    remoteStream
+  } = useWebRTC({ channel, userEmail });
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [targetUser, setTargetUser] = useState<string>('ALL');
@@ -69,13 +83,35 @@ export default function TeamChatPage() {
 
     channel.on('broadcast', { event: 'new_message' }, handleNewMessage);
 
-    return () => {
-      // No removemos el canal porque es global, pero removemos el listener si es posible
-      // En Supabase JS, usually .on returns the channel, but there is no easy .off 
-      // for specific handlers on a shared channel without removing the channel.
-      // However, multiple .on calls on the same event add to a list. 
+    // Signaling listeners for existing call
+    const handleSlingalingEvents = (payload: any) => {
+       const p = payload.payload;
+       if (p.targetUser !== userEmail) return;
+
+       if (payload.event === 'call_offer') {
+          // If we're already on this page, the Context will show the incoming call state
+          // but we might want to trigger the hook's handleOffer too
+       } else if (payload.event === 'call_answer') {
+          handleAnswer(p);
+       } else if (payload.event === 'call_ice_candidate') {
+          handleCandidate(p);
+       } else if (payload.event === 'call_hangup') {
+          hangUp();
+       }
     };
-  }, [channel, isConnected, userEmail]);
+
+    channel.on('broadcast', { event: 'call_offer' }, (p) => {
+      if (p.payload.targetUser === userEmail) {
+         handleOffer(p.payload);
+      }
+    });
+    channel.on('broadcast', { event: 'call_answer' }, (p) => p.payload.targetUser === userEmail && handleAnswer(p.payload));
+    channel.on('broadcast', { event: 'call_ice_candidate' }, (p) => p.payload.targetUser === userEmail && handleCandidate(p.payload));
+    channel.on('broadcast', { event: 'call_hangup' }, (p) => p.payload.targetUser === userEmail && hangUp());
+
+    return () => {
+    };
+  }, [channel, isConnected, userEmail, handleAnswer, handleCandidate, handleOffer, hangUp]);
 
   const handleSendBipper = async (target?: string) => {
     if (!channel || !isConnected) return;
@@ -250,13 +286,22 @@ export default function TeamChatPage() {
             {onlineUsers.map(user => (
               <div key={user} className="flex items-center gap-1 bg-slate-800/80 border border-slate-700/50 rounded-lg pl-3 pr-1.5 py-1.5 shadow-sm group">
                 <span className="text-[10px] font-bold text-blue-300 font-mono tracking-tighter truncate max-w-[100px]">{user}</span>
-                <button 
-                  onClick={() => handleSendBipper(user)}
-                  className="p-1 hover:bg-amber-500/20 text-slate-500 hover:text-amber-400 rounded transition-all"
-                  title={`Mandar Bip a ${user}`}
-                >
-                  <Bell className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center">
+                  <button 
+                    onClick={() => makeCall(user)}
+                    className="p-1 hover:bg-emerald-500/20 text-slate-500 hover:text-emerald-400 rounded transition-all"
+                    title={`Llamar a ${user}`}
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                  </button>
+                  <button 
+                    onClick={() => handleSendBipper(user)}
+                    className="p-1 hover:bg-amber-500/20 text-slate-500 hover:text-amber-400 rounded transition-all"
+                    title={`Mandar Bip a ${user}`}
+                  >
+                    <Bell className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
             <button 
@@ -404,6 +449,75 @@ export default function TeamChatPage() {
           </form>
         </div>
       </div>
+
+      {/* Voice Call Overlay */}
+      {callStatus !== 'idle' && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" />
+          <div className="relative bg-slate-900 border border-slate-700/50 rounded-2xl p-8 max-w-sm w-full shadow-2xl flex flex-col items-center animate-in zoom-in-95 duration-200">
+            
+            <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 relative ${
+              callStatus === 'connected' ? 'bg-emerald-500/20 ring-4 ring-emerald-500/30' : 'bg-blue-500/20 ring-4 ring-blue-500/30'
+            }`}>
+              {callStatus === 'incoming' ? (
+                <PhoneIncoming className="w-10 h-10 text-emerald-400 animate-bounce" />
+              ) : callStatus === 'calling' ? (
+                <Volume2 className="w-10 h-10 text-blue-400 animate-pulse" />
+              ) : (
+                <Radio className="w-10 h-10 text-emerald-400" />
+              )}
+              
+              {callStatus === 'connected' && (
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-4 border-slate-900 flex items-center justify-center">
+                   <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+                </div>
+              )}
+            </div>
+
+            <h3 className="text-xl font-bold text-white mb-1 uppercase tracking-wider">{currentPeer}</h3>
+            <p className={`text-xs font-mono mb-8 uppercase tracking-widest ${
+              callStatus === 'connected' ? 'text-emerald-400' : 'text-slate-500 animate-pulse'
+            }`}>
+              {callStatus === 'incoming' ? 'Llamada Entrante' : 
+               callStatus === 'calling' ? 'Llamando...' : 
+               callStatus === 'connected' ? 'CONEXIÓN ESTABLECIDA' : 'Finalizando...'}
+            </p>
+
+            <div className="flex gap-6">
+              {callStatus === 'incoming' && (
+                <button
+                  onClick={() => {
+                    acceptCall();
+                    setIncomingCall(null);
+                  }}
+                  className="w-14 h-14 bg-emerald-500 hover:bg-emerald-600 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105"
+                >
+                  <Phone className="w-6 h-6 text-white" />
+                </button>
+              )}
+              
+              <button
+                onClick={() => {
+                  hangUp();
+                  setIncomingCall(null);
+                }}
+                className="w-14 h-14 bg-rose-600 hover:bg-rose-700 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-105"
+              >
+                <PhoneOff className="w-6 h-6 text-white" />
+              </button>
+            </div>
+
+            {/* Remote Audio Element (Hidden) */}
+            {remoteStream && (
+               <audio 
+                 ref={(el) => { if (el) el.srcObject = remoteStream; }} 
+                 autoPlay 
+                 className="hidden" 
+               />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
