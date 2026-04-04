@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Radio, Send, ShieldAlert, Users, Zap, Mic, Square, Lock, Bell } from 'lucide-react';
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { usePresence } from '@/contexts/PresenceContext';
 
 interface ChatMessage {
   id: string;
@@ -19,14 +19,11 @@ interface ChatMessage {
 }
 
 export default function TeamChatPage() {
+  const { onlineUsers, isConnected, channel, userEmail } = usePresence();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
-  const [userEmail, setUserEmail] = useState<string>('Ingeniero');
-  const [isConnected, setIsConnected] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [targetUser, setTargetUser] = useState<string>('ALL');
   
-  const channelRef = useRef<RealtimeChannel | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Audio Recording State
@@ -45,94 +42,46 @@ export default function TeamChatPage() {
   }, [messages]);
 
   useEffect(() => {
-    let activeChannel: RealtimeChannel;
+    if (!channel || !isConnected) return;
 
-    const initChat = async () => {
-      const { data } = await supabase.auth.getUser();
-      const email = data?.user?.email || 'Ingeniero Desconocido';
-      const shortName = email.split('@')[0];
-      setUserEmail(shortName);
-
-      // El sonido del bipper ahora lo maneja el PresenceTracker global
-      // para que suene incluso si el usuario está en otra sección.
-
-      activeChannel = supabase.channel('engineering-frequency', {
-        config: {
-          broadcast: { self: false },
-          presence: { key: shortName }
+    const handleNewMessage = (payload: any) => {
+      const p = payload.payload;
+      
+      // FILTRO CIFRADO: Ignorar si es privado y NO soy ni el objetivo ni el remitente original
+      if (p.targetUser && p.targetUser !== 'ALL') {
+        if (p.targetUser !== userEmail && p.senderName !== userEmail) {
+          return; // Desechar el paquete, no es para ti.
         }
-      });
+      }
 
-      channelRef.current = activeChannel;
-
-      activeChannel.on('presence', { event: 'sync' }, () => {
-        const state = activeChannel.presenceState();
-        // Extract all connected user names
-        const users = Object.keys(state);
-        // Remove current user from the list so they don't message themselves
-        const otherUsers = users.filter(u => u !== shortName);
-        setOnlineUsers(otherUsers);
-      });
-
-      activeChannel.on('broadcast', { event: 'bipper' }, (payload) => {
-        const p = payload.payload;
-        if (p.targetUser === 'ALL' || p.targetUser === shortName) {
-          // El sonido es manejado por el tracker global. 
-          // Aquí se podría añadir una notificación visual si se desea.
-          console.log("Bip recibido de:", p.senderName);
-        }
-      });
-
-      activeChannel.on('broadcast', { event: 'new_message' }, (payload) => {
-        const p = payload.payload;
-        
-        // FILTRO CIFRADO: Ignorar si es privado y NO soy ni el objetivo ni el remitente original (broadcast self: false ya evita remitente, pero por seguridad)
-        if (p.targetUser && p.targetUser !== 'ALL') {
-          if (p.targetUser !== shortName && p.senderName !== shortName) {
-            return; // Desechar el paquete, no es para ti.
-          }
-        }
-
-        const newMessage: ChatMessage = {
-          id: Math.random().toString(36).substring(7),
-          senderName: p.senderName,
-          text: p.text,
-          audioData: p.audioData,
-          type: p.type || 'text',
-          targetUser: p.targetUser || 'ALL',
-          timestamp: new Date(p.timestamp),
-          isSelf: false
-        };
-        setMessages((prev) => [...prev, newMessage]);
-      });
-
-      activeChannel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setIsConnected(true);
-          // Ya no trackeamos aquí, lo hace el PresenceTracker global
-        } else {
-          setIsConnected(false);
-          setOnlineUsers([]);
-        }
-      });
+      const newMessage: ChatMessage = {
+        id: Math.random().toString(36).substring(7),
+        senderName: p.senderName,
+        text: p.text,
+        audioData: p.audioData,
+        type: p.type || 'text',
+        targetUser: p.targetUser || 'ALL',
+        timestamp: new Date(p.timestamp),
+        isSelf: false
+      };
+      setMessages((prev) => [...prev, newMessage]);
     };
 
-    initChat();
+    channel.on('broadcast', { event: 'new_message' }, handleNewMessage);
 
     return () => {
-      if (activeChannel) {
-        // No des-trackeamos aquí para no afectar el seguimiento global
-        supabase.removeChannel(activeChannel);
-      }
-      if (timerRef.current) clearInterval(timerRef.current);
+      // No removemos el canal porque es global, pero removemos el listener si es posible
+      // En Supabase JS, usually .on returns the channel, but there is no easy .off 
+      // for specific handlers on a shared channel without removing the channel.
+      // However, multiple .on calls on the same event add to a list. 
     };
-  }, []);
+  }, [channel, isConnected, userEmail]);
 
   const handleSendBipper = async (target?: string) => {
-    if (!channelRef.current || !isConnected) return;
+    if (!channel || !isConnected) return;
     const dest = target || targetUser;
     
-    await channelRef.current.send({
+    await channel.send({
       type: 'broadcast',
       event: 'bipper',
       payload: {
@@ -148,7 +97,7 @@ export default function TeamChatPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || !channelRef.current || !isConnected || isRecording) return;
+    if (!inputText.trim() || !channel || !isConnected || isRecording) return;
 
     const time = new Date();
     
@@ -166,7 +115,7 @@ export default function TeamChatPage() {
     setMessages((prev) => [...prev, myMessage]);
     
     // Transmit
-    await channelRef.current.send({
+    await channel.send({
       type: 'broadcast',
       event: 'new_message',
       payload: {
@@ -214,7 +163,7 @@ export default function TeamChatPage() {
           
           setMessages((prev) => [...prev, myAudioMsg]);
           
-          await channelRef.current?.send({
+          await channel?.send({
             type: 'broadcast',
             event: 'new_message',
             payload: {

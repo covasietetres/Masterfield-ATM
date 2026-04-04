@@ -1,10 +1,22 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
-export function PresenceTracker() {
+interface PresenceContextType {
+  onlineUsers: string[];
+  isConnected: boolean;
+  channel: RealtimeChannel | null;
+  userEmail: string;
+}
+
+const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
+
+export function PresenceProvider({ children }: { children: React.ReactNode }) {
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>('Ingeniero');
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
@@ -16,6 +28,7 @@ export function PresenceTracker() {
 
       const email = user.email || 'Ingeniero Desconocido';
       const shortName = email.split('@')[0];
+      setUserEmail(shortName);
 
       activeChannel = supabase.channel('engineering-frequency', {
         config: {
@@ -26,7 +39,7 @@ export function PresenceTracker() {
 
       channelRef.current = activeChannel;
 
-      // Event listener for bipper (global alert)
+      // Global Bipper Alert
       activeChannel.on('broadcast', { event: 'bipper' }, (payload) => {
         const p = payload.payload;
         if (p.targetUser === 'ALL' || p.targetUser === shortName) {
@@ -34,12 +47,22 @@ export function PresenceTracker() {
         }
       });
 
+      activeChannel.on('presence', { event: 'sync' }, () => {
+        const state = activeChannel.presenceState();
+        const users = Object.keys(state);
+        const otherUsers = users.filter(u => u !== shortName);
+        setOnlineUsers(otherUsers);
+      });
+
       activeChannel.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
+          setIsConnected(true);
           activeChannel.track({ 
             online_at: new Date().toISOString(),
             status: 'online'
           });
+        } else {
+          setIsConnected(false);
         }
       });
     };
@@ -77,5 +100,17 @@ export function PresenceTracker() {
     };
   }, []);
 
-  return null; // This component doesn't render anything
+  return (
+    <PresenceContext.Provider value={{ onlineUsers, isConnected, channel: channelRef.current, userEmail }}>
+      {children}
+    </PresenceContext.Provider>
+  );
+}
+
+export function usePresence() {
+  const context = useContext(PresenceContext);
+  if (context === undefined) {
+    throw new Error('usePresence must be used within a PresenceProvider');
+  }
+  return context;
 }
