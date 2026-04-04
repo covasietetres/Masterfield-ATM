@@ -53,28 +53,8 @@ export default function TeamChatPage() {
       const shortName = email.split('@')[0];
       setUserEmail(shortName);
 
-      const playBipperSound = () => {
-        try {
-          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const oscillator = audioCtx.createOscillator();
-          const gainNode = audioCtx.createGain();
-
-          oscillator.type = 'sine';
-          oscillator.frequency.setValueAtTime(950, audioCtx.currentTime);
-          oscillator.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
-
-          gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
-
-          oscillator.connect(gainNode);
-          gainNode.connect(audioCtx.destination);
-
-          oscillator.start();
-          oscillator.stop(audioCtx.currentTime + 0.25);
-        } catch (e) {
-          console.error("Audio error:", e);
-        }
-      };
+      // El sonido del bipper ahora lo maneja el PresenceTracker global
+      // para que suene incluso si el usuario está en otra sección.
 
       activeChannel = supabase.channel('engineering-frequency', {
         config: {
@@ -97,7 +77,9 @@ export default function TeamChatPage() {
       activeChannel.on('broadcast', { event: 'bipper' }, (payload) => {
         const p = payload.payload;
         if (p.targetUser === 'ALL' || p.targetUser === shortName) {
-          playBipperSound();
+          // El sonido es manejado por el tracker global. 
+          // Aquí se podría añadir una notificación visual si se desea.
+          console.log("Bip recibido de:", p.senderName);
         }
       });
 
@@ -127,7 +109,7 @@ export default function TeamChatPage() {
       activeChannel.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           setIsConnected(true);
-          activeChannel.track({ online_at: new Date().toISOString() });
+          // Ya no trackeamos aquí, lo hace el PresenceTracker global
         } else {
           setIsConnected(false);
           setOnlineUsers([]);
@@ -139,7 +121,7 @@ export default function TeamChatPage() {
 
     return () => {
       if (activeChannel) {
-        activeChannel.untrack();
+        // No des-trackeamos aquí para no afectar el seguimiento global
         supabase.removeChannel(activeChannel);
       }
       if (timerRef.current) clearInterval(timerRef.current);
