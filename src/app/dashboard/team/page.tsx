@@ -37,6 +37,7 @@ export default function TeamChatPage() {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -160,13 +161,22 @@ export default function TeamChatPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2 ${
+        <div className="flex items-center gap-2 md:gap-4">
+          <div className={`px-2 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-medium flex items-center gap-1 md:gap-2 ${
             isConnected ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
           }`}>
-            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-            {isConnected ? 'TRANSMITIENDO' : 'SIN SEÑAL'}
+            <span className={`w-1.5 md:w-2 h-1.5 md:h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+            <span className="hidden sm:inline">{isConnected ? 'TRANSMITIENDO' : 'SIN SEÑAL'}</span>
+            <span className="sm:hidden">{isConnected ? 'ON' : 'OFF'}</span>
           </div>
+
+          {/* Mobile Sidebar Toggle */}
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="md:hidden p-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white"
+          >
+            <Users className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
@@ -272,11 +282,25 @@ export default function TeamChatPage() {
         </div>
 
         {/* Sidebar: Online Users */}
-        <div className="w-72 bg-slate-900/30 border-l border-slate-800 p-4 hide-scrollbar">
-          <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-            <Users className="w-3 h-3" />
-            Unidades en Línea
-          </h2>
+        <div className={`
+          fixed md:relative inset-y-0 right-0 z-40
+          w-72 bg-slate-900 md:bg-slate-900/30 border-l border-slate-800 p-4 
+          transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
+          hide-scrollbar
+        `}>
+          <div className="flex items-center justify-between mb-4 md:mb-6">
+            <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+              <Users className="w-3 h-3" />
+              Unidades en Línea
+            </h2>
+            <button 
+              onClick={() => setIsSidebarOpen(false)}
+              className="md:hidden p-1 text-slate-500 hover:text-white"
+            >
+              <Trash2 className="w-4 h-4 rotate-45" /> {/* Close icon alternative */}
+            </button>
+          </div>
           <div className="space-y-2">
             {onlineUsers.length === 0 ? (
               <div className="p-4 rounded-xl border border-dashed border-slate-800 text-center">
