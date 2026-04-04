@@ -312,24 +312,26 @@ export default function ConsultaPage() {
 
                 <div suppressHydrationWarning className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                   <button
-                    onClick={() => setOcrMode(!ocrMode)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${ocrMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-                      }`}
-                  >
-                    <AlignLeft className="w-4 h-4" />
-                    {ocrMode ? 'Ocultar OCR' : 'Ver OCR'}
-                  </button>
-
-                  <button
                     suppressHydrationWarning
-                    onClick={() => isSpeakingOCR ? stopSpeaking() : speakOCR(selectedDoc.content_text || '')}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${isSpeakingOCR
+                    onClick={() => isSpeakingOCR ? stopSpeaking() : (selectedDoc.content_text ? speakOCR(selectedDoc.content_text) : handleReindex(selectedDoc))}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
+                      selectedDoc.indexing
+                        ? 'bg-blue-600 animate-pulse text-white border-blue-500'
+                        : isSpeakingOCR
                         ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30'
                         : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
-                      }`}
+                    }`}
                   >
-                    {isSpeakingOCR ? <VolumeX className="w-4 h-4 shrink-0" /> : <Volume2 className="w-4 h-4 shrink-0" />}
-                    <span suppressHydrationWarning className="truncate">{isSpeakingOCR ? 'Detener Lectura' : 'Lectura Inteligente'}</span>
+                    {selectedDoc.indexing ? (
+                      <RotateCcw className="w-4 h-4 animate-spin shrink-0" />
+                    ) : isSpeakingOCR ? (
+                      <VolumeX className="w-4 h-4 shrink-0" />
+                    ) : (
+                      <Volume2 className="w-4 h-4 shrink-0" />
+                    )}
+                    <span suppressHydrationWarning className="truncate">
+                      {selectedDoc.indexing ? 'Procesando...' : isSpeakingOCR ? 'Detener Lectura' : 'Lectura Inteligente'}
+                    </span>
                   </button>
 
                   <button
