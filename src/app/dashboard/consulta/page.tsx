@@ -3,19 +3,20 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  Search, 
-  Send, 
-  Database, 
-  Eye, 
-  Volume2, 
-  VolumeX, 
-  X, 
-  Loader2, 
-  Bot, 
+import {
+  Search,
+  Send,
+  Database,
+  Eye,
+  Volume2,
+  VolumeX,
+  X,
+  Loader2,
+  Bot,
   MessageSquare,
   AlignLeft,
-  BookOpen
+  BookOpen,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
@@ -30,6 +31,7 @@ interface KnowledgeDocument {
   uploaded_by: string;
   created_at: string;
   content_text?: string;
+  indexing?: boolean;
 }
 
 export default function ConsultaPage() {
@@ -111,6 +113,47 @@ export default function ConsultaPage() {
     return data.publicUrl;
   };
 
+  const handleReindex = async (doc: KnowledgeDocument) => {
+    if (doc.indexing) return;
+    try {
+      setResults(prev => prev.map(d => d.id === doc.id ? { ...d, indexing: true } : d));
+      if (selectedDoc?.id === doc.id) setSelectedDoc({ ...selectedDoc, indexing: true });
+
+      const res = await fetch('/api/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: doc.id,
+          bucket: doc.file_type === 'pdf' ? 'manuals' : 'media',
+          path: doc.storage_path,
+          fileType: doc.file_type,
+          title: doc.title
+        })
+      });
+
+      if (!res.ok) throw new Error('Falla en el motor de ingesta');
+      
+      // Consultar el documento actualizado
+      const { data: updatedDoc, error: updateError } = await supabase
+        .from('knowledge_documents')
+        .select('*')
+        .eq('id', doc.id)
+        .single();
+      
+      if (updateError) throw updateError;
+
+      setResults(prev => prev.map(d => d.id === doc.id ? updatedDoc : d));
+      if (selectedDoc?.id === doc.id) setSelectedDoc(updatedDoc);
+      alert('¡Documento procesado correctamente! Ahora la lectura inteligente está disponible.');
+    } catch (err: any) {
+      console.error(err);
+      alert('Error de indexación: ' + err.message);
+    } finally {
+      setResults(prev => prev.map(d => d.id === doc.id ? { ...d, indexing: false } : d));
+      if (selectedDoc?.id === doc.id) setSelectedDoc(prev => prev ? { ...prev, indexing: false } : null);
+    }
+  };
+
   return (
     <div suppressHydrationWarning className="max-w-6xl mx-auto space-y-12 py-8">
       {/* Search Section */}
@@ -172,7 +215,7 @@ export default function ConsultaPage() {
                     </div>
                     <span className="text-[10px] bg-slate-800 px-2 py-1 rounded-full text-slate-400 uppercase font-black tracking-widest">{doc.file_type}</span>
                   </div>
-                  
+
                   <div className="flex-1">
                     <h3 className="text-white font-bold text-sm tracking-tight uppercase line-clamp-2">{doc.title}</h3>
                     <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-widest">{doc.brand}</p>
@@ -190,14 +233,19 @@ export default function ConsultaPage() {
                         if (doc.content_text) {
                           isSpeakingOCR ? stopSpeaking() : speakOCR(doc.content_text);
                         } else {
-                          alert("Lectura inteligente no disponible para este archivo.");
+                          handleReindex(doc);
                         }
                       }}
                       className={`flex items-center justify-center p-2.5 rounded-xl transition-all shadow-lg ${
-                        isSpeakingOCR ? 'bg-red-500/20 text-red-500 ring-1 ring-red-500/30' : 'bg-slate-800 text-slate-400 hover:bg-emerald-600 hover:text-white'
+                        doc.indexing 
+                          ? 'bg-blue-600 animate-pulse text-white'
+                          : isSpeakingOCR 
+                          ? 'bg-red-500/20 text-red-500 ring-1 ring-red-500/30' 
+                          : 'bg-slate-800 text-slate-400 hover:bg-emerald-600 hover:text-white'
                       }`}
+                      title={!doc.content_text ? "Extraer texto (re-indexar)" : "Lectura inteligente"}
                     >
-                      <Volume2 className="w-4 h-4" />
+                      {doc.indexing ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
                     </button>
                   </div>
                 </motion.div>
@@ -252,7 +300,7 @@ export default function ConsultaPage() {
                       <p className="text-[10px] text-slate-500 uppercase tracking-wider">Documento {selectedDoc.file_type} · {selectedDoc.brand}</p>
                     </div>
                   </div>
-                  
+
                   <button
                     suppressHydrationWarning
                     onClick={() => { setSelectedDoc(null); setOcrMode(false); stopSpeaking(); }}
@@ -265,9 +313,8 @@ export default function ConsultaPage() {
                 <div suppressHydrationWarning className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                   <button
                     onClick={() => setOcrMode(!ocrMode)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
-                      ocrMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-                    }`}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${ocrMode ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                      }`}
                   >
                     <AlignLeft className="w-4 h-4" />
                     {ocrMode ? 'Ocultar OCR' : 'Ver OCR'}
@@ -276,11 +323,10 @@ export default function ConsultaPage() {
                   <button
                     suppressHydrationWarning
                     onClick={() => isSpeakingOCR ? stopSpeaking() : speakOCR(selectedDoc.content_text || '')}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
-                      isSpeakingOCR
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${isSpeakingOCR
                         ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30'
                         : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
-                    }`}
+                      }`}
                   >
                     {isSpeakingOCR ? <VolumeX className="w-4 h-4 shrink-0" /> : <Volume2 className="w-4 h-4 shrink-0" />}
                     <span suppressHydrationWarning className="truncate">{isSpeakingOCR ? 'Detener Lectura' : 'Lectura Inteligente'}</span>
@@ -337,7 +383,22 @@ export default function ConsultaPage() {
                       ) : (
                         <div className="flex flex-col items-center justify-center h-full text-center gap-4">
                           <BookOpen className="w-10 h-10 text-slate-700" />
-                          <p className="text-slate-500 text-xs font-bold uppercase">Sin texto extraído</p>
+                          <div className="space-y-4">
+                            <div>
+                              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Sin texto extraído</p>
+                              <p className="text-slate-600 text-[10px] mt-1 uppercase tracking-tight">Presiona el botón para procesar este archivo ahora</p>
+                            </div>
+                            <button
+                              onClick={() => handleReindex(selectedDoc)}
+                              disabled={selectedDoc.indexing}
+                              className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl flex items-center gap-2 mx-auto ${
+                                selectedDoc.indexing ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'
+                              }`}
+                            >
+                              <RotateCcw className={`w-4 h-4 ${selectedDoc.indexing ? 'animate-spin' : ''}`} />
+                              {selectedDoc.indexing ? 'Procesando con IA...' : 'Procesar con OCR'}
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
