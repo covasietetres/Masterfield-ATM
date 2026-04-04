@@ -4,11 +4,24 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import { supabase } from '@/lib/supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
+export interface ChatMessage {
+  id: string;
+  senderName: string;
+  text?: string;
+  audioData?: string;
+  type: 'text' | 'audio';
+  targetUser: string;
+  timestamp: Date;
+  isSelf: boolean;
+}
+
 interface PresenceContextType {
   onlineUsers: string[];
   isConnected: boolean;
   channel: RealtimeChannel | null;
   userEmail: string;
+  messages: ChatMessage[];
+  addLocalMessage: (msg: ChatMessage) => void;
   incomingCall: { senderName: string; offer: any } | null;
   setIncomingCall: (call: { senderName: string; offer: any } | null) => void;
 }
@@ -19,8 +32,13 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [userEmail, setUserEmail] = useState<string>('Ingeniero');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [incomingCall, setIncomingCall] = useState<{ senderName: string; offer: any } | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
+
+  const addLocalMessage = (msg: ChatMessage) => {
+    setMessages((prev) => [...prev, msg]);
+  };
 
   useEffect(() => {
     let activeChannel: RealtimeChannel;
@@ -56,6 +74,30 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         if (p.targetUser === shortName) {
            setIncomingCall({ senderName: p.senderName, offer: p.offer });
         }
+      });
+
+      // Global Message Listener (Unified)
+      activeChannel.on('broadcast', { event: 'new_message' }, (payload) => {
+        const p = payload.payload;
+        
+        // Privacy Filter
+        if (p.targetUser && p.targetUser !== 'ALL') {
+          if (p.targetUser !== shortName && p.senderName !== shortName) {
+            return; 
+          }
+        }
+
+        const newMessage: ChatMessage = {
+          id: Math.random().toString(36).substring(7),
+          senderName: p.senderName,
+          text: p.text,
+          audioData: p.audioData,
+          type: p.type || 'text',
+          targetUser: p.targetUser || 'ALL',
+          timestamp: new Date(p.timestamp),
+          isSelf: false
+        };
+        setMessages((prev) => [...prev, newMessage]);
       });
 
       activeChannel.on('presence', { event: 'sync' }, () => {
@@ -117,6 +159,8 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
       isConnected, 
       channel: channelRef.current, 
       userEmail,
+      messages,
+      addLocalMessage,
       incomingCall,
       setIncomingCall
     }}>

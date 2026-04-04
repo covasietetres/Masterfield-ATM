@@ -5,22 +5,12 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Radio, Send, ShieldAlert, Users, Zap, Mic, Square, Lock, Bell, Phone, PhoneOff, PhoneIncoming, Volume2 } from 'lucide-react';
-import { usePresence } from '@/contexts/PresenceContext';
+// ChatMessage is now imported from PresenceContext
+import { usePresence, ChatMessage } from '@/contexts/PresenceContext';
 import { useWebRTC } from '@/hooks/useWebRTC';
 
-interface ChatMessage {
-  id: string;
-  senderName: string;
-  text?: string;
-  audioData?: string;
-  type: 'text' | 'audio';
-  targetUser: string; // 'ALL' o el email del usuario específico
-  timestamp: Date;
-  isSelf: boolean;
-}
-
 export default function TeamChatPage() {
-  const { onlineUsers, isConnected, channel, userEmail, incomingCall, setIncomingCall } = usePresence();
+  const { onlineUsers, isConnected, channel, userEmail, incomingCall, setIncomingCall, messages, addLocalMessage } = usePresence();
   
   const {
     callStatus,
@@ -34,7 +24,7 @@ export default function TeamChatPage() {
     remoteStream
   } = useWebRTC({ channel, userEmail });
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [inputText, setInputText] = useState('');
   const [targetUser, setTargetUser] = useState<string>('ALL');
   
@@ -58,60 +48,39 @@ export default function TeamChatPage() {
   useEffect(() => {
     if (!channel || !isConnected) return;
 
-    const handleNewMessage = (payload: any) => {
-      const p = payload.payload;
-      
-      // FILTRO CIFRADO: Ignorar si es privado y NO soy ni el objetivo ni el remitente original
-      if (p.targetUser && p.targetUser !== 'ALL') {
-        if (p.targetUser !== userEmail && p.senderName !== userEmail) {
-          return; // Desechar el paquete, no es para ti.
-        }
-      }
-
-      const newMessage: ChatMessage = {
-        id: Math.random().toString(36).substring(7),
-        senderName: p.senderName,
-        text: p.text,
-        audioData: p.audioData,
-        type: p.type || 'text',
-        targetUser: p.targetUser || 'ALL',
-        timestamp: new Date(p.timestamp),
-        isSelf: false
-      };
-      setMessages((prev) => [...prev, newMessage]);
-    };
-
-    channel.on('broadcast', { event: 'new_message' }, handleNewMessage);
-
-    // Signaling listeners for existing call
-    const handleSlingalingEvents = (payload: any) => {
-       const p = payload.payload;
-       if (p.targetUser !== userEmail) return;
-
-       if (payload.event === 'call_offer') {
-          // If we're already on this page, the Context will show the incoming call state
-          // but we might want to trigger the hook's handleOffer too
-       } else if (payload.event === 'call_answer') {
-          handleAnswer(p);
-       } else if (payload.event === 'call_ice_candidate') {
-          handleCandidate(p);
-       } else if (payload.event === 'call_hangup') {
-          hangUp();
-       }
-    };
+    // Solo los listeners de señalización específicos de la llamada activa
+    // Los mensajes generales ya los maneja el contexto global.
 
     channel.on('broadcast', { event: 'call_offer' }, (p) => {
       if (p.payload.targetUser === userEmail) {
          handleOffer(p.payload);
       }
     });
-    channel.on('broadcast', { event: 'call_answer' }, (p) => p.payload.targetUser === userEmail && handleAnswer(p.payload));
-    channel.on('broadcast', { event: 'call_ice_candidate' }, (p) => p.payload.targetUser === userEmail && handleCandidate(p.payload));
-    channel.on('broadcast', { event: 'call_hangup' }, (p) => p.payload.targetUser === userEmail && hangUp());
+
+    channel.on('broadcast', { event: 'call_answer' }, (p) => {
+       if (p.payload.targetUser === userEmail) handleAnswer(p.payload);
+    });
+
+    channel.on('broadcast', { event: 'call_ice_candidate' }, (p) => {
+       if (p.payload.targetUser === userEmail) handleCandidate(p.payload);
+    });
+
+    channel.on('broadcast', { event: 'call_hangup' }, (p) => {
+       if (p.payload.targetUser === userEmail) hangUp();
+    });
 
     return () => {
+       // El canal es global, no lo removemos aquí.
     };
   }, [channel, isConnected, userEmail, handleAnswer, handleCandidate, handleOffer, hangUp]);
+
+  // Efecto para vincular el stream remoto de forma robusta
+  useEffect(() => {
+    if (remoteStream && audioRef.current) {
+      audioRef.current.srcObject = remoteStream;
+      audioRef.current.play().catch(e => console.error("Error reproduciendo audio remoto:", e));
+    }
+  }, [remoteStream]);
 
   const handleSendBipper = async (target?: string) => {
     if (!channel || !isConnected) return;
@@ -148,7 +117,7 @@ export default function TeamChatPage() {
       isSelf: true
     };
     
-    setMessages((prev) => [...prev, myMessage]);
+    addLocalMessage(myMessage);
     
     // Transmit
     await channel.send({
@@ -180,7 +149,7 @@ export default function TeamChatPage() {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
@@ -197,7 +166,7 @@ export default function TeamChatPage() {
             isSelf: true
           };
           
-          setMessages((prev) => [...prev, myAudioMsg]);
+          addLocalMessage(myAudioMsg);
           
           await channel?.send({
             type: 'broadcast',
@@ -507,14 +476,12 @@ export default function TeamChatPage() {
               </button>
             </div>
 
-            {/* Remote Audio Element (Hidden) */}
-            {remoteStream && (
-               <audio 
-                 ref={(el) => { if (el) el.srcObject = remoteStream; }} 
-                 autoPlay 
-                 className="hidden" 
-               />
-            )}
+            {/* Remote Audio Element (Hidden but functional) */}
+            <audio 
+              ref={audioRef} 
+              autoPlay 
+              className="hidden" 
+            />
           </div>
         </div>
       )}

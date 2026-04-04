@@ -113,6 +113,7 @@ export function useWebRTC({ channel, userEmail }: WebRTCOptions) {
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    await processCandidateQueue();
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
@@ -133,20 +134,43 @@ export function useWebRTC({ channel, userEmail }: WebRTCOptions) {
     const { answer } = payload;
     if (peerConnectionRef.current) {
       await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+      await processCandidateQueue();
       setCallStatus('connected');
     }
   };
 
+  const candidateQueue = useRef<RTCIceCandidateInit[]>([]);
+
   const handleCandidate = async (payload: any) => {
     const { candidate } = payload;
-    if (peerConnectionRef.current && candidate) {
-      try {
+    if (!peerConnectionRef.current || !candidate) return;
+
+    try {
+      if (peerConnectionRef.current.remoteDescription && peerConnectionRef.current.remoteDescription.type) {
         await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (e) {
-        console.error('Error adding received ice candidate', e);
+      } else {
+        candidateQueue.current.push(candidate);
       }
+    } catch (e) {
+      console.error('Error adding received ice candidate', e);
     }
   };
+
+  // En handleAnswer y acceptCall, después de pc.setRemoteDescription, procesamos la cola:
+  const processCandidateQueue = useCallback(async () => {
+    if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
+      while (candidateQueue.current.length > 0) {
+        const candidate = candidateQueue.current.shift();
+        if (candidate) {
+          try {
+            await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.error('Error processing queued candidate', e);
+          }
+        }
+      }
+    }
+  }, []);
 
   const hangUp = () => {
     if (peerConnectionRef.current) {
