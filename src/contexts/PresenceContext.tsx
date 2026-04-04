@@ -114,7 +114,8 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             online_at: new Date().toISOString(),
             status: 'online'
           });
-        } else {
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          // Solo marcamos como desconectado si es un error real o cierre
           setIsConnected(false);
         }
       });
