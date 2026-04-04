@@ -132,14 +132,14 @@ export default function ConsultaPage() {
       });
 
       if (!res.ok) throw new Error('Falla en el motor de ingesta');
-      
+
       // Consultar el documento actualizado
       const { data: updatedDoc, error: updateError } = await supabase
         .from('knowledge_documents')
         .select('*')
         .eq('id', doc.id)
         .single();
-      
+
       if (updateError) throw updateError;
 
       setResults(prev => prev.map(d => d.id === doc.id ? updatedDoc : d));
@@ -236,13 +236,12 @@ export default function ConsultaPage() {
                           handleReindex(doc);
                         }
                       }}
-                      className={`flex items-center justify-center p-2.5 rounded-xl transition-all shadow-lg ${
-                        doc.indexing 
+                      className={`flex items-center justify-center p-2.5 rounded-xl transition-all shadow-lg ${doc.indexing
                           ? 'bg-blue-600 animate-pulse text-white'
-                          : isSpeakingOCR 
-                          ? 'bg-red-500/20 text-red-500 ring-1 ring-red-500/30' 
-                          : 'bg-slate-800 text-slate-400 hover:bg-emerald-600 hover:text-white'
-                      }`}
+                          : isSpeakingOCR
+                            ? 'bg-red-500/20 text-red-500 ring-1 ring-red-500/30'
+                            : 'bg-slate-800 text-slate-400 hover:bg-emerald-600 hover:text-white'
+                        }`}
                       title={!doc.content_text ? "Extraer texto (re-indexar)" : "Lectura inteligente"}
                     >
                       {doc.indexing ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
@@ -314,13 +313,12 @@ export default function ConsultaPage() {
                   <button
                     suppressHydrationWarning
                     onClick={() => isSpeakingOCR ? stopSpeaking() : (selectedDoc.content_text ? speakOCR(selectedDoc.content_text) : handleReindex(selectedDoc))}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
-                      selectedDoc.indexing
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${selectedDoc.indexing
                         ? 'bg-blue-600 animate-pulse text-white border-blue-500'
                         : isSpeakingOCR
-                        ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30'
-                        : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
-                    }`}
+                          ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30'
+                          : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
+                      }`}
                   >
                     {selectedDoc.indexing ? (
                       <RotateCcw className="w-4 h-4 animate-spin shrink-0" />
@@ -393,9 +391,8 @@ export default function ConsultaPage() {
                             <button
                               onClick={() => handleReindex(selectedDoc)}
                               disabled={selectedDoc.indexing}
-                              className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl flex items-center gap-2 mx-auto ${
-                                selectedDoc.indexing ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'
-                              }`}
+                              className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl flex items-center gap-2 mx-auto ${selectedDoc.indexing ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'
+                                }`}
                             >
                               <RotateCcw className={`w-4 h-4 ${selectedDoc.indexing ? 'animate-spin' : ''}`} />
                               {selectedDoc.indexing ? 'Procesando con IA...' : 'Procesar con OCR'}

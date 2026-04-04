@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Radio, Send, ShieldAlert, Users, Zap, Mic, Square, Lock } from 'lucide-react';
+import { Radio, Send, ShieldAlert, Users, Zap, Mic, Square, Lock, Bell } from 'lucide-react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface ChatMessage {
@@ -53,6 +53,29 @@ export default function TeamChatPage() {
       const shortName = email.split('@')[0];
       setUserEmail(shortName);
 
+      const playBipperSound = () => {
+        try {
+          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const oscillator = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
+
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(950, audioCtx.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+
+          gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+
+          oscillator.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+
+          oscillator.start();
+          oscillator.stop(audioCtx.currentTime + 0.25);
+        } catch (e) {
+          console.error("Audio error:", e);
+        }
+      };
+
       activeChannel = supabase.channel('engineering-frequency', {
         config: {
           broadcast: { self: false },
@@ -69,6 +92,13 @@ export default function TeamChatPage() {
         // Remove current user from the list so they don't message themselves
         const otherUsers = users.filter(u => u !== shortName);
         setOnlineUsers(otherUsers);
+      });
+
+      activeChannel.on('broadcast', { event: 'bipper' }, (payload) => {
+        const p = payload.payload;
+        if (p.targetUser === 'ALL' || p.targetUser === shortName) {
+          playBipperSound();
+        }
       });
 
       activeChannel.on('broadcast', { event: 'new_message' }, (payload) => {
@@ -115,6 +145,24 @@ export default function TeamChatPage() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
+
+  const handleSendBipper = async (target?: string) => {
+    if (!channelRef.current || !isConnected) return;
+    const dest = target || targetUser;
+    
+    await channelRef.current.send({
+      type: 'broadcast',
+      event: 'bipper',
+      payload: {
+        senderName: userEmail,
+        targetUser: dest,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    // Feedback visual opcional o sonido local
+    console.log(`[BIPPER] Enviado a ${dest}`);
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,12 +305,37 @@ export default function TeamChatPage() {
             </div>
             {isConnected && (
               <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
-                <Users className="w-3.5 h-3.5" />
-                {onlineUsers.length + 1} en línea
+                <Users className="w-3.5 h-3.5 text-blue-400" />
+                <span className="font-bold text-white">{onlineUsers.length + 1}</span> en línea
               </div>
             )}
           </div>
         </div>
+
+        {/* Online Operators Strip */}
+        {isConnected && onlineUsers.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2 items-center">
+            <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest mr-2">Operadores:</span>
+            {onlineUsers.map(user => (
+              <div key={user} className="flex items-center gap-1 bg-slate-800/80 border border-slate-700/50 rounded-lg pl-3 pr-1.5 py-1.5 shadow-sm group">
+                <span className="text-[10px] font-bold text-blue-300 font-mono tracking-tighter truncate max-w-[100px]">{user}</span>
+                <button 
+                  onClick={() => handleSendBipper(user)}
+                  className="p-1 hover:bg-amber-500/20 text-slate-500 hover:text-amber-400 rounded transition-all"
+                  title={`Mandar Bip a ${user}`}
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+            <button 
+              onClick={() => handleSendBipper('ALL')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 border border-blue-500/30 text-blue-400 rounded-lg hover:bg-blue-600/20 transition-all text-[9px] font-bold uppercase tracking-widest"
+            >
+              <Bell className="w-3.5 h-3.5" /> Alertar a Todos
+            </button>
+          </div>
+        )}
       </header>
 
       <div className="flex-1 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl flex flex-col relative">
