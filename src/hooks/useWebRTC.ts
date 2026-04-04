@@ -6,9 +6,10 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 interface WebRTCOptions {
   channel: RealtimeChannel | null;
   userEmail: string;
+  onCallSignal: (callback: (event: string, payload: any) => void) => () => void;
 }
 
-export function useWebRTC({ channel, userEmail }: WebRTCOptions) {
+export function useWebRTC({ channel, userEmail, onCallSignal }: WebRTCOptions) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'incoming' | 'connected' | 'ended'>('idle');
@@ -169,7 +170,6 @@ export function useWebRTC({ channel, userEmail }: WebRTCOptions) {
   }, []);
 
   const hangUp = useCallback(() => {
-    // Evitar recursion si ya estamos en proceso de colgar
     if (callStatus === 'idle') return;
 
     if (peerConnectionRef.current) {
@@ -182,7 +182,6 @@ export function useWebRTC({ channel, userEmail }: WebRTCOptions) {
       setLocalStream(null);
     }
     
-    // Capturamos el peer antes de limpiarlo para el mensaje de broadcast
     const peerToNotify = currentPeer;
 
     setRemoteStream(null);
@@ -200,6 +199,19 @@ export function useWebRTC({ channel, userEmail }: WebRTCOptions) {
        }).catch(e => console.error("Error al enviar hangup:", e));
     }
   }, [channel, currentPeer, localStream, userEmail, callStatus]);
+
+  // Switchboard Listener
+  useEffect(() => {
+    const unsubscribe = onCallSignal((event, payload) => {
+      switch (event) {
+        case 'call_offer': handleOffer(payload); break;
+        case 'call_answer': handleAnswer(payload); break;
+        case 'call_ice_candidate': handleCandidate(payload); break;
+        case 'call_hangup': hangUp(); break;
+      }
+    });
+    return () => unsubscribe();
+  }, [onCallSignal, handleOffer, handleAnswer, handleCandidate, hangUp]);
 
   return {
     localStream,

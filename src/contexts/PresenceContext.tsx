@@ -24,6 +24,7 @@ interface PresenceContextType {
   addLocalMessage: (msg: ChatMessage) => void;
   incomingCall: { senderName: string; offer: any } | null;
   setIncomingCall: (call: { senderName: string; offer: any } | null) => void;
+  onCallSignal: (callback: (event: string, payload: any) => void) => () => void;
 }
 
 const PresenceContext = createContext<PresenceContextType | undefined>(undefined);
@@ -35,6 +36,14 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [incomingCall, setIncomingCall] = useState<{ senderName: string; offer: any } | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const signalCallbacks = useRef<((event: string, payload: any) => void)[]>([]);
+
+  const onCallSignal = (callback: (event: string, payload: any) => void) => {
+    signalCallbacks.current.push(callback);
+    return () => {
+      signalCallbacks.current = signalCallbacks.current.filter(cb => cb !== callback);
+    };
+  };
 
   const addLocalMessage = (msg: ChatMessage) => {
     setMessages((prev) => [...prev, msg]);
@@ -68,11 +77,33 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-      // Signaling for calls
+      // Signaling Switchboard (Centralized)
       activeChannel.on('broadcast', { event: 'call_offer' }, (payload) => {
         const p = payload.payload;
         if (p.targetUser === shortName) {
            setIncomingCall({ senderName: p.senderName, offer: p.offer });
+           signalCallbacks.current.forEach(cb => cb('call_offer', p));
+        }
+      });
+
+      activeChannel.on('broadcast', { event: 'call_answer' }, (payload) => {
+        const p = payload.payload;
+        if (p.targetUser === shortName) {
+           signalCallbacks.current.forEach(cb => cb('call_answer', p));
+        }
+      });
+
+      activeChannel.on('broadcast', { event: 'call_ice_candidate' }, (payload) => {
+        const p = payload.payload;
+        if (p.targetUser === shortName) {
+           signalCallbacks.current.forEach(cb => cb('call_ice_candidate', p));
+        }
+      });
+
+      activeChannel.on('broadcast', { event: 'call_hangup' }, (payload) => {
+        const p = payload.payload;
+        if (p.targetUser === shortName) {
+           signalCallbacks.current.forEach(cb => cb('call_hangup', p));
         }
       });
 
@@ -163,7 +194,8 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
       messages,
       addLocalMessage,
       incomingCall,
-      setIncomingCall
+      setIncomingCall,
+      onCallSignal
     }}>
       {children}
     </PresenceContext.Provider>
