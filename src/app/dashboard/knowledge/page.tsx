@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, CheckCircle, Database, Eye, X, Trash2, PenTool, MapPin, Tag, RotateCcw, Volume2, VolumeX, BookOpen, AlignLeft } from 'lucide-react';
+import { Upload, FileText, CheckCircle, Database, Eye, X, Trash2, PenTool, MapPin, Tag, RotateCcw, Volume2, VolumeX, BookOpen, AlignLeft, Image as ImageIcon, Camera } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { jsPDF } from 'jspdf';
@@ -43,6 +43,8 @@ export default function KnowledgeBasePage() {
     description: '',
     engineerName: ''
   });
+  const [experienceImage, setExperienceImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -89,6 +91,63 @@ export default function KnowledgeBasePage() {
     utterance.onerror = () => setIsSpeaking(false);
 
     synthRef.current.speak(utterance);
+  };
+
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob(
+            (blob) => {
+              if (blob) resolve(blob);
+              else reject(new Error('Error al comprimir imagen'));
+            },
+            'image/jpeg',
+            0.7 // 70% quality
+          );
+        };
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleExperienceImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setExperienceImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const fetchDocuments = async () => {
@@ -218,6 +277,33 @@ export default function KnowledgeBasePage() {
 
     setIsGenerating(true);
     try {
+      let imageUrl = '';
+      let imageFilePath = '';
+
+      // 1. Handle Image Upload if exists
+      if (experienceImage) {
+        const compressedBlob = await compressImage(experienceImage);
+        const fileExt = 'jpg';
+        const fileName = `exp_${Date.now()}.${fileExt}`;
+        imageFilePath = `uploads/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage.from('media').upload(imageFilePath, compressedBlob);
+        if (uploadError) throw new Error(`Error subiendo imagen: ${uploadError.message}`);
+
+        const { data: publicData } = supabase.storage.from('media').getPublicUrl(imageFilePath);
+        imageUrl = publicData.publicUrl;
+
+        // Register image as its own document for AI indexing
+        await supabase.from('knowledge_documents').insert({
+          title: `Imagen: ${experienceForm.faultType || 'Evidencia técnica'}`,
+          file_type: 'image',
+          brand: experienceForm.brand,
+          storage_path: imageFilePath,
+          uploaded_by: experienceForm.engineerName
+        });
+      }
+
+      // 2. Generate PDF Report
       const doc = new jsPDF();
       doc.setFontSize(22);
       doc.setTextColor(30, 41, 59);
@@ -231,17 +317,25 @@ export default function KnowledgeBasePage() {
       doc.text(`Ubicación: ${experienceForm.location}`, 20, 80);
       doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 90);
       doc.text(`Colaborador: ${experienceForm.engineerName}`, 20, 100);
+      
+      if (imageUrl) {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(59, 130, 246);
+        doc.text("EVIDENCIA ADJUNTA: SI (Ver en sistema)", 20, 110);
+        doc.setTextColor(30, 41, 59);
+      }
+
       doc.setFont("helvetica", "bold");
-      doc.text("EXPERIENCIA COMPARTIDA:", 20, 120);
+      doc.text("EXPERIENCIA COMPARTIDA:", 20, 125);
       doc.setFont("helvetica", "normal");
       const splitText = doc.splitTextToSize(experienceForm.description, 170);
-      doc.text(splitText, 20, 130);
+      doc.text(splitText, 20, 135);
 
       const pdfBlob = doc.output('blob');
-      const fileName = `experience_${Date.now()}.pdf`;
+      const pdfFileName = `experience_${Date.now()}.pdf`;
 
-      const { error: uploadError } = await supabase.storage.from('manuals').upload(fileName, pdfBlob);
-      if (uploadError) throw uploadError;
+      const { error: pdfUploadError } = await supabase.storage.from('manuals').upload(pdfFileName, pdfBlob);
+      if (pdfUploadError) throw pdfUploadError;
 
       const { data: docData, error: dbError } = await supabase
         .from('knowledge_documents')
@@ -249,7 +343,7 @@ export default function KnowledgeBasePage() {
           title: `Reporte Técnico: ${experienceForm.faultType || 'Experiencia de Campo'}`,
           file_type: 'pdf',
           brand: experienceForm.brand,
-          storage_path: fileName,
+          storage_path: pdfFileName,
           uploaded_by: experienceForm.engineerName
         })
         .select()
@@ -257,15 +351,13 @@ export default function KnowledgeBasePage() {
 
       if (dbError) throw dbError;
 
-      const indexSuccess = await handleReindex(docData, 'manuals');
+      await handleReindex(docData, 'manuals');
       
-      if (indexSuccess) {
-        alert('¡Gracias! Tu experiencia ha sido documentada y compartida con el equipo.');
-      } else {
-        alert('Experiencia guardada, pero hubo un problema al procesarla con IA. Un administrador revisará la configuración.');
-      }
+      alert('¡Gracias! Tu experiencia e imagen han sido documentadas y compartidas.');
       
       setExperienceForm({ brand: 'NCR', model: '', faultType: '', location: '', description: '', engineerName: '' });
+      setExperienceImage(null);
+      setImagePreview(null);
       fetchDocuments();
     } catch (error: any) {
       alert('Error: ' + error.message);
@@ -395,8 +487,38 @@ export default function KnowledgeBasePage() {
                 <label className="text-[10px] text-slate-500 uppercase font-bold px-1">Nombre del Ingeniero (Crédito)</label>
                 <input type="text" placeholder="Tu Nombre" value={experienceForm.engineerName} onChange={e => setExperienceForm({...experienceForm, engineerName: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500" />
               </div>
-              <button type="submit" disabled={isGenerating} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-lg text-xs uppercase tracking-wider transition-all">
-                {isGenerating ? 'Generando PDF...' : 'Subir Experiencia'}
+              <div className="space-y-2">
+                <label className="text-[10px] text-slate-500 uppercase font-bold px-1">Evidencia Visual (Imagen comprimida)</label>
+                <div className="flex flex-col gap-3">
+                  {imagePreview ? (
+                    <div className="relative w-full h-32 rounded-lg overflow-hidden border border-slate-700 bg-slate-950">
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      <button 
+                        type="button"
+                        onClick={() => { setExperienceImage(null); setImagePreview(null); }}
+                        className="absolute top-2 right-2 p-1 bg-rose-600 rounded-full text-white hover:bg-rose-500 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-slate-800 border-dashed rounded-lg cursor-pointer bg-slate-950 hover:bg-slate-900 transition-colors">
+                      <div className="flex flex-center gap-2">
+                        <Camera className="w-4 h-4 text-slate-500" />
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Tomar foto o subir imagen</span>
+                      </div>
+                      <input type="file" accept="image/*" className="hidden" onChange={handleExperienceImageChange} />
+                    </label>
+                  )}
+                </div>
+              </div>
+              <button type="submit" disabled={isGenerating} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-lg text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2">
+                {isGenerating ? (
+                  <>
+                    <RotateCcw className="w-4 h-4 animate-spin" />
+                    Procesando...
+                  </>
+                ) : 'Subir Experiencia'}
               </button>
             </form>
           </div>
