@@ -50,6 +50,202 @@ export default function KnowledgeBasePage() {
 
   const [activeTab, setActiveTab] = useState<'upload' | 'experience'>('upload');
 
+  useEffect(() => {
+    setMounted(true);
+    fetchDocuments();
+    if (typeof window !== 'undefined') {
+      synthRef.current = window.speechSynthesis;
+    }
+    return () => {
+      if (synthRef.current) synthRef.current.cancel();
+    };
+  }, []);
+
+  const fetchDocuments = async () => {
+    const { data, error } = await supabase
+      .from('knowledge_documents')
+      .select('*, knowledge_chunks(count)')
+      .order('created_at', { ascending: false });
+
+    if (error) console.error('Error fetching documents:', error);
+    else setDocuments(data || []);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop()?.toLowerCase();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const bucket = fileExt === 'pdf' ? 'manuals' : 'media';
+      const storagePath = `uploads/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(storagePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: docData, error: dbError } = await supabase
+        .from('knowledge_documents')
+        .insert({
+          title: file.name,
+          file_type: fileExt === 'pdf' ? 'pdf' : (fileExt === 'mp4' ? 'video' : 'image'),
+          brand: 'GENERIC',
+          storage_path: storagePath,
+          uploaded_by: 'system'
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+
+      // Trigger ingestion
+      await fetch('/api/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: docData.id,
+          bucket,
+          path: storagePath,
+          fileType: docData.file_type,
+          title: docData.title
+        })
+      });
+
+      setSuccess(true);
+      setFile(null);
+      fetchDocuments();
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('Error al subir archivo');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleExperienceImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setExperienceImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleShareExperience = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsGenerating(true);
+    try {
+      let storagePath = '';
+      if (experienceImage) {
+        const fileExt = experienceImage.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const { data, error: uploadError } = await supabase.storage
+          .from('media')
+          .upload(`experiences/${fileName}`, experienceImage);
+        
+        if (uploadError) throw uploadError;
+        storagePath = data.path;
+      }
+
+      const pdf = new jsPDF();
+      pdf.setFontSize(20);
+      pdf.text('BITÁCORA DE FALLA TÉCNICA', 20, 20);
+      pdf.setFontSize(12);
+      pdf.text(`Marca: ${experienceForm.brand}`, 20, 40);
+      pdf.text(`Modelo: ${experienceForm.model}`, 20, 50);
+      pdf.text(`Falla: ${experienceForm.faultType}`, 20, 60);
+      pdf.text(`Ubicación: ${experienceForm.location}`, 20, 70);
+      pdf.text(`Ingeniero: ${experienceForm.engineerName}`, 20, 80);
+      pdf.text('Descripción:', 20, 100);
+      const lines = pdf.splitTextToSize(experienceForm.description, 170);
+      pdf.text(lines, 20, 110);
+
+      const pdfBlob = pdf.output('blob');
+      const pdfFileName = `EXP_${Date.now()}.pdf`;
+      const pdfPath = `experiences/${pdfFileName}`;
+
+      const { error: pdfUploadError } = await supabase.storage
+        .from('manuals')
+        .upload(pdfPath, pdfBlob);
+
+      if (pdfUploadError) throw pdfUploadError;
+
+      const { error: dbError } = await supabase
+        .from('knowledge_documents')
+        .insert({
+          title: `Experiencia: ${experienceForm.faultType}`,
+          file_type: 'pdf',
+          brand: experienceForm.brand,
+          storage_path: pdfPath,
+          uploaded_by: experienceForm.engineerName
+        });
+
+      if (dbError) throw dbError;
+
+      alert('Experiencia guardada y convertida a PDF exitosamente.');
+      setExperienceForm({ brand: 'NCR', model: '', faultType: '', location: '', description: '', engineerName: '' });
+      setExperienceImage(null);
+      setImagePreview(null);
+      fetchDocuments();
+    } catch (err) {
+      console.error('Submit error:', err);
+      alert('Error al guardar experiencia');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const getPublicUrl = (doc: KnowledgeDocument) => {
+    const bucket = doc.file_type === 'pdf' ? 'manuals' : 'media';
+    const { data } = supabase.storage.from(bucket).getPublicUrl(doc.storage_path);
+    return data.publicUrl;
+  };
+
+  const stopSpeaking = () => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
+  const speakOCR = (text: string) => {
+    if (!synthRef.current) return;
+    stopSpeaking();
+    const utterance = new SpeechSynthesisUtterance(text.slice(0, 3000));
+    utterance.lang = 'es-ES';
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    synthRef.current.speak(utterance);
+  };
+
+  const handleDelete = async (doc: KnowledgeDocument) => {
+    if (!confirm(`¿Estás seguro de eliminar "${doc.title}"?`)) return;
+    try {
+      const bucket = doc.file_type === 'pdf' ? 'manuals' : 'media';
+      const { error: storageError } = await supabase.storage.from(bucket).remove([doc.storage_path]);
+      if (storageError) throw storageError;
+
+      const { error: dbError } = await supabase.from('knowledge_documents').delete().eq('id', doc.id);
+      if (dbError) throw dbError;
+
+      fetchDocuments();
+      if (selectedDoc?.id === doc.id) setSelectedDoc(null);
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert('Error al eliminar documento');
+    }
+  };
+
   return (
     <div suppressHydrationWarning className="max-w-6xl mx-auto space-y-6 md:space-y-10 pb-10">
       <header className="mb-4 md:mb-10 border-b border-slate-800 pb-8 relative overflow-hidden">

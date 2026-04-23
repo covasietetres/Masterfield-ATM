@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, Search, Plus, Navigation, Trash2, Map } from 'lucide-react';
+import { MapPin, Search, Plus, Navigation, Trash2, Map, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 

@@ -13,10 +13,12 @@ import {
   PhoneCall, 
   PhoneOff, 
   User,
-  Zap
+  Zap,
+  X
 } from 'lucide-react';
 import { usePresence, ChatMessage } from '@/contexts/PresenceContext';
 import { useWebRTC } from '@/hooks/useWebRTC';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function TeamChatPage() {
   const { onlineUsers, isConnected, channel, userEmail, incomingCall, setIncomingCall, messages, addLocalMessage, onCallSignal } = usePresence();
