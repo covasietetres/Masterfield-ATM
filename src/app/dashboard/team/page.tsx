@@ -86,10 +86,20 @@ export default function TeamChatPage() {
     setInputText('');
   };
 
+  // Recording Timer / Visual Feedback
+  const [recordDuration, setRecordDuration] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      
+      // Determine supported mime type
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
+        ? 'audio/webm;codecs=opus' 
+        : (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm');
+
+      const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
@@ -98,7 +108,7 @@ export default function TeamChatPage() {
       };
 
       recorder.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(chunksRef.current, { type: mimeType });
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
@@ -132,17 +142,66 @@ export default function TeamChatPage() {
 
       recorder.start();
       setIsRecording(true);
+      setRecordDuration(0);
+      timerRef.current = setInterval(() => {
+        setRecordDuration(prev => prev + 1);
+      }, 1000);
+
+      // Haptic feedback if available
+      if ('vibrate' in navigator) navigator.vibrate(50);
+      
     } catch (err) {
       console.error("Error al grabar:", err);
+      alert("No se pudo acceder al micrófono. Verifica los permisos.");
     }
   };
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+      if (mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
       setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+      if ('vibrate' in navigator) navigator.vibrate(20);
     }
   };
+
+  // Ringing Sound Logic
+  useEffect(() => {
+    let ringInterval: NodeJS.Timeout | null = null;
+    
+    if (callStatus === 'calling' || callStatus === 'incoming') {
+      const playRing = () => {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const playTone = (freq: number, start: number, duration: number) => {
+          const oscillator = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
+          gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime + start);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + start + duration);
+          oscillator.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+          oscillator.start(audioCtx.currentTime + start);
+          oscillator.stop(audioCtx.currentTime + start + duration);
+        };
+        
+        // Double pulse "Rinnng-Rinnng"
+        playTone(440, 0, 0.4);
+        playTone(480, 0, 0.4);
+        playTone(440, 0.6, 0.4);
+        playTone(480, 0.6, 0.4);
+      };
+
+      playRing();
+      ringInterval = setInterval(playRing, 2500);
+    }
+
+    return () => {
+      if (ringInterval) clearInterval(ringInterval);
+    };
+  }, [callStatus]);
 
   return (
     <div className="flex flex-col h-[calc(100dvh-140px)] md:h-[calc(100vh-120px)] bg-slate-950 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl relative">
@@ -225,90 +284,74 @@ export default function TeamChatPage() {
             )}
           </div>
 
-          {/* Floating Push-to-Talk (MOBILE ONLY) */}
-          <div className="md:hidden absolute bottom-6 left-0 right-0 flex flex-col items-center gap-4 z-30 px-6">
-             <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 p-2 rounded-full shadow-2xl flex items-center gap-2 pr-4">
-                <select 
-                  value={targetUser}
-                  onChange={(e) => setTargetUser(e.target.value)}
-                  className="bg-slate-800 border-none text-blue-400 text-[9px] font-black rounded-full px-4 py-2 outline-none uppercase tracking-widest transition-all appearance-none text-center min-w-[120px]"
-                >
-                  <option value="ALL">Canal: ALL</option>
-                  {onlineUsers.map(user => (
-                    <option key={user} value={user}>Priv: {user}</option>
-                  ))}
-                </select>
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50" />
-             </div>
-
-             <button
-                onMouseDown={startRecording}
-                onMouseUp={stopRecording}
-                onMouseLeave={stopRecording}
-                onTouchStart={startRecording}
-                onTouchEnd={stopRecording}
-                className={`w-20 h-20 rounded-full transition-all shadow-2xl flex items-center justify-center border-4 ${
-                  isRecording 
-                    ? 'bg-rose-600 border-rose-400 scale-110 animate-pulse shadow-rose-600/40 text-white' 
-                    : 'bg-blue-600 border-blue-400 text-white shadow-blue-600/40 active:scale-95'
-                }`}
-              >
-                {isRecording ? <Zap className="w-8 h-8 fill-current" /> : <Mic className="w-8 h-8" />}
-              </button>
-              <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.4em]">Mantener para Hablar</p>
-          </div>
-
-          {/* Controls Bar (DESKTOP ONLY) */}
-          <div className="hidden md:block p-6 bg-slate-900/90 border-t border-slate-800 backdrop-blur-xl z-20">
-            <div className="flex items-center gap-6 mb-4 px-2">
-              <div className="flex items-center gap-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                <Shield className="w-4 h-4 text-blue-500" />
-                Destinatario de Señal:
+          {/* Unified Controls Bar (MOBILE & DESKTOP) */}
+          <div className="p-4 md:p-6 bg-slate-900/95 border-t border-slate-800 backdrop-blur-2xl z-20">
+            {/* Context/Target Selector */}
+            <div className="flex items-center gap-4 mb-3 md:mb-4 px-1">
+              <div className="flex items-center gap-2 text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                <Shield className="w-3 h-3 md:w-4 md:h-4 text-blue-500" />
+                <span className="hidden sm:inline">Transmitir a:</span>
+                <span className="sm:hidden">Red:</span>
               </div>
               <select 
                 value={targetUser}
                 onChange={(e) => setTargetUser(e.target.value)}
-                className="bg-slate-950 border border-slate-800 text-blue-400 text-[10px] font-black rounded-xl px-4 py-2 outline-none focus:border-blue-500/50 transition-all cursor-pointer uppercase tracking-widest"
+                className="bg-slate-950 border border-slate-800 text-blue-400 text-[9px] md:text-[10px] font-black rounded-full md:rounded-xl px-4 py-1.5 md:py-2 outline-none focus:border-blue-500 transition-all cursor-pointer uppercase tracking-widest appearance-none sm:appearance-auto"
               >
-                <option value="ALL">[ Canales Abiertos ]</option>
+                <option value="ALL">Canal: [ Público ]</option>
                 {onlineUsers.map(user => (
-                  <option key={user} value={user}>[ PRIVADO: {user} ]</option>
+                  <option key={user} value={user}>Priv: {user}</option>
                 ))}
               </select>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
+              {/* PTT Button */}
               <button
                 onMouseDown={startRecording}
                 onMouseUp={stopRecording}
                 onMouseLeave={stopRecording}
-                className={`p-5 rounded-2xl transition-all shadow-2xl flex-shrink-0 border ${
+                onTouchStart={(e) => { e.preventDefault(); startRecording(); }}
+                onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
+                className={`p-4 md:p-5 rounded-2xl md:rounded-2xl transition-all shadow-2xl flex-shrink-0 border-2 relative ${
                   isRecording 
-                    ? 'bg-rose-600 border-rose-500 text-white scale-95 animate-pulse shadow-rose-600/20' 
-                    : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-blue-400 hover:border-blue-500/50'
+                    ? 'bg-rose-600 border-rose-400 text-white scale-95 animate-pulse shadow-rose-600/40' 
+                    : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-blue-400 hover:border-blue-500/50 active:scale-95'
                 }`}
+                title="Mantener para enviar voz (PTT)"
               >
-                <Mic className="w-6 h-6" />
+                {isRecording ? <Zap className="w-6 h-6 fill-current" /> : <Mic className="w-6 h-6" />}
+                {isRecording && (
+                  <span className="absolute -top-12 left-1/2 -translate-x-1/2 bg-rose-600 text-[10px] font-black px-3 py-1 rounded-full shadow-xl border border-rose-400 animate-bounce">
+                    {recordDuration}s
+                  </span>
+                )}
               </button>
 
-              <div className="flex-1 relative">
+              <div className="flex-1 relative flex items-center">
                 <input
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  placeholder="Inyectar mensaje a la red..."
-                  className="w-full bg-slate-950 text-white rounded-2xl px-6 py-5 text-sm outline-none border border-slate-800 focus:border-blue-500 transition-all placeholder:text-slate-700 shadow-inner"
+                  placeholder="Inyectar mensaje..."
+                  className="w-full bg-slate-950 text-white rounded-2xl px-5 md:px-6 py-4 md:py-5 text-sm outline-none border border-slate-800 focus:border-blue-500 transition-all placeholder:text-slate-700 shadow-inner"
                 />
               </div>
 
               <button
                 onClick={sendMessage}
-                className="p-5 bg-blue-600 hover:bg-blue-500 rounded-2xl text-white transition-all shadow-2xl shadow-blue-900/40 active:scale-90"
+                disabled={!inputText.trim()}
+                className="p-4 md:p-5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-2xl transition-all shadow-2xl shadow-blue-900/40 active:scale-90 flex-shrink-0"
               >
                 <Send className="w-6 h-6" />
               </button>
             </div>
+            
+            {/* Mobile PTT Label */}
+            <p className="md:hidden text-center text-[8px] font-black text-slate-600 uppercase tracking-[0.3em] mt-3">
+              {isRecording ? 'Transmitiendo Voz...' : 'Botón Mic: Mantener para Hablar'}
+            </p>
           </div>
         </div>
 

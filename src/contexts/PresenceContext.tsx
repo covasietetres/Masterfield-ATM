@@ -73,7 +73,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
       activeChannel.on('broadcast', { event: 'bipper' }, (payload) => {
         const p = payload.payload;
         if (p.targetUser === 'ALL' || p.targetUser === shortName) {
-           playBipperSound();
+           playNotificationSound();
         }
       });
 
@@ -81,6 +81,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
       activeChannel.on('broadcast', { event: 'call_offer' }, (payload) => {
         const p = payload.payload;
         if (p.targetUser === shortName) {
+           playNotificationSound();
            setIncomingCall({ senderName: p.senderName, offer: p.offer });
            signalCallbacks.current.forEach(cb => cb('call_offer', p));
         }
@@ -118,6 +119,11 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        // Play sound if message is not from self
+        if (p.senderName !== shortName) {
+          playNotificationSound();
+        }
+
         const newMessage: ChatMessage = {
           id: Math.random().toString(36).substring(7),
           senderName: p.senderName,
@@ -146,30 +152,30 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
             status: 'online'
           });
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          // Solo marcamos como desconectado si es un error real o cierre
           setIsConnected(false);
         }
       });
     };
 
-    const playBipperSound = () => {
+    const playNotificationSound = () => {
        try {
          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-         const oscillator = audioCtx.createOscillator();
-         const gainNode = audioCtx.createGain();
+         const playTone = (freq: number, start: number, duration: number) => {
+           const oscillator = audioCtx.createOscillator();
+           const gainNode = audioCtx.createGain();
+           oscillator.type = 'sine';
+           oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
+           gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime + start);
+           gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + start + duration);
+           oscillator.connect(gainNode);
+           gainNode.connect(audioCtx.destination);
+           oscillator.start(audioCtx.currentTime + start);
+           oscillator.stop(audioCtx.currentTime + start + duration);
+         };
 
-         oscillator.type = 'sine';
-         oscillator.frequency.setValueAtTime(950, audioCtx.currentTime);
-         oscillator.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
-
-         gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-         gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
-
-         oscillator.connect(gainNode);
-         gainNode.connect(audioCtx.destination);
-
-         oscillator.start();
-         oscillator.stop(audioCtx.currentTime + 0.25);
+         // Cell phone style "ding-ding" (A5 to C6)
+         playTone(880, 0, 0.1);
+         playTone(1046, 0.12, 0.25);
        } catch (e) {
          console.error("Audio error:", e);
        }
