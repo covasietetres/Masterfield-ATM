@@ -40,11 +40,10 @@ export function Sidebar() {
   };
 
   const navItems = [
-    { name: 'Terminal', href: '/dashboard', icon: Home },
-    { name: 'Consulta', href: '/dashboard/consulta', icon: MessageSquare },
-    { name: 'Frecuencia (En Vivo)', href: '/dashboard/team', icon: Radio },
-    { name: 'Base de Conocimientos', href: '/dashboard/knowledge', icon: FileText },
-    { name: 'Sitios Técnicos', href: '/dashboard/sites', icon: MapPin },
+    { name: 'Consulta AI', href: '/dashboard/consulta', icon: MessageSquare },
+    { name: 'Sites / Lugares', href: '/dashboard/sites', icon: MapPin },
+    { name: 'Vivo (Frecuencia)', href: '/dashboard/team', icon: Radio },
+    { name: 'Biblioteca', href: '/dashboard/knowledge', icon: FileText },
     { name: 'Configuración', href: '/dashboard/settings', icon: Settings },
   ];
 
