@@ -155,38 +155,45 @@ export default function ConsultaPage() {
   };
 
   return (
-    <div suppressHydrationWarning className="max-w-6xl mx-auto space-y-12 py-8">
+    <div suppressHydrationWarning className="max-w-6xl mx-auto space-y-8 md:space-y-12 py-6 md:py-8 pb-20 md:pb-8">
       {/* Search Section */}
-      <section className="text-center space-y-8">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-2xl shadow-blue-900/30">
-            <Bot className="w-10 h-10 text-white" />
+      <section className="text-center space-y-6 md:space-y-10 px-4">
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative">
+            <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-20 animate-pulse" />
+            <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-[2.5rem] bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-2xl shadow-blue-900/40 ring-1 ring-white/20">
+              <Bot className="w-10 h-10 md:w-12 md:h-12 text-white" />
+            </div>
           </div>
-          <div>
-            <h1 className="text-4xl font-black text-white tracking-widest uppercase">Consulta Técnica</h1>
-            <p className="text-slate-400 font-medium tracking-wide">Hola ingeniero, ¿Qué documento deseas consultar hoy?</p>
+          <div className="space-y-2">
+            <h1 className="text-2xl md:text-5xl font-black text-white tracking-tighter md:tracking-widest uppercase">
+              Asistente de Campo IA
+            </h1>
+            <p className="text-[10px] md:text-sm text-slate-500 font-black uppercase tracking-[0.3em]">
+              Búsqueda Semántica en Corpus Técnico
+            </p>
           </div>
         </div>
 
-        <form onSubmit={handleSearch} className="max-w-3xl mx-auto relative group px-4">
-          <div className="absolute inset-0 bg-blue-600/20 blur-3xl group-focus-within:bg-blue-600/40 transition-all" />
-          <div className="relative flex items-center bg-slate-900 border border-slate-700/80 rounded-2xl overflow-hidden shadow-2xl focus-within:border-blue-500/50 transition-all">
-            <div className="pl-6 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-              <Search className="w-6 h-6" />
+        <form onSubmit={handleSearch} className="max-w-3xl mx-auto relative group">
+          <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-[2rem] blur opacity-20 group-focus-within:opacity-40 transition-all duration-500" />
+          <div className="relative flex items-center bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/10 transition-all duration-500">
+            <div className="pl-6 text-slate-600 group-focus-within:text-blue-400 transition-colors">
+              <Search className="w-6 h-6 md:w-7 md:h-7" />
             </div>
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ej: Manual NCR Dispensador, Error 12, Diebold 5500..."
-              className="flex-1 bg-transparent border-none text-white text-lg py-5 px-6 focus:outline-none placeholder:text-slate-600 font-medium"
+              placeholder="ej. Error 12 NCR, Manual 6622..."
+              className="flex-1 bg-transparent border-none text-white text-base md:text-xl py-5 md:py-7 px-4 md:px-8 focus:outline-none placeholder:text-slate-700 font-bold tracking-tight"
             />
             <button
               type="submit"
               disabled={isLoading || query.length < 3}
-              className="mr-3 p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all disabled:opacity-50 disabled:bg-slate-800"
+              className="mr-3 md:mr-4 p-4 md:p-5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl transition-all disabled:opacity-50 disabled:bg-slate-800 shadow-xl shadow-blue-900/40 active:scale-95"
             >
-              {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Send className="w-6 h-6" />}
+              {isLoading ? <Loader2 className="w-6 h-6 md:w-7 md:h-7 animate-spin" /> : <Send className="w-6 h-6 md:w-7 md:h-7" />}
             </button>
           </div>
         </form>
@@ -194,12 +201,19 @@ export default function ConsultaPage() {
 
       {/* Results Area */}
       <section className="relative px-4">
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center py-20 gap-6">
+            <div className="w-16 h-16 border-4 border-blue-500/10 border-t-blue-500 rounded-full animate-spin shadow-2xl shadow-blue-500/20" />
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] animate-pulse">Consultando Cerebro Central...</p>
+          </div>
+        )}
+
         <AnimatePresence mode="popLayout">
-          {results.length > 0 ? (
+          {results.length > 0 && !isLoading ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8"
             >
               {results.map((doc, idx) => (
                 <motion.div
@@ -207,26 +221,35 @@ export default function ConsultaPage() {
                   layout
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0, transition: { delay: idx * 0.05 } }}
-                  className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col gap-4 hover:border-blue-500/50 hover:bg-slate-800/50 transition-all group shadow-xl"
+                  className="bg-slate-900 border border-slate-800 p-5 md:p-8 rounded-3xl flex flex-col gap-6 hover:border-blue-500/50 hover:bg-slate-800 transition-all group shadow-2xl relative overflow-hidden"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="p-3 bg-blue-500/10 rounded-xl text-blue-400 group-hover:scale-110 transition-transform">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
+                  
+                  <div className="flex items-start justify-between relative z-10">
+                    <div className="p-4 bg-blue-500/10 rounded-2xl text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 group-hover:scale-110 shadow-lg">
                       <Database className="w-6 h-6" />
                     </div>
-                    <span className="text-[10px] bg-slate-800 px-2 py-1 rounded-full text-slate-400 uppercase font-black tracking-widest">{doc.file_type}</span>
+                    <span className="text-[9px] bg-slate-800 px-3 py-1.5 rounded-xl text-slate-400 uppercase font-black tracking-widest border border-slate-700 shadow-inner">
+                      {doc.file_type}
+                    </span>
                   </div>
 
-                  <div className="flex-1">
-                    <h3 className="text-white font-bold text-sm tracking-tight uppercase line-clamp-2">{doc.title}</h3>
-                    <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-widest">{doc.brand}</p>
+                  <div className="flex-1 relative z-10">
+                    <h3 className="text-white font-black text-base md:text-lg tracking-tight uppercase line-clamp-2 leading-tight group-hover:text-blue-400 transition-colors">
+                      {doc.title}
+                    </h3>
+                    <div className="flex items-center gap-3 mt-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                      <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">{doc.brand}</p>
+                    </div>
                   </div>
 
-                  <div className="flex gap-3 pt-4 border-t border-slate-800/50">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-slate-800/50 relative z-10">
                     <button
                       onClick={() => setSelectedDoc(doc)}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-800 hover:bg-blue-600 text-slate-200 hover:text-white rounded-xl transition-all font-bold text-[10px] uppercase tracking-widest shadow-lg"
+                      className="flex-1 flex items-center justify-center gap-3 py-4 bg-slate-950 hover:bg-blue-600 text-slate-400 hover:text-white rounded-2xl transition-all font-black text-[10px] uppercase tracking-widest shadow-xl border border-slate-800 active:scale-95"
                     >
-                      <Eye className="w-4 h-4" /> Ver Documento
+                      <Eye className="w-4 h-4" /> Visualizar
                     </button>
                     <button
                       onClick={() => {
@@ -236,15 +259,16 @@ export default function ConsultaPage() {
                           handleReindex(doc);
                         }
                       }}
-                      className={`flex items-center justify-center p-2.5 rounded-xl transition-all shadow-lg ${doc.indexing
-                          ? 'bg-blue-600 animate-pulse text-white'
+                      className={`flex items-center justify-center p-4 rounded-2xl transition-all shadow-xl active:scale-95 border ${
+                        doc.indexing
+                          ? 'bg-blue-600 animate-pulse text-white border-blue-400'
                           : isSpeakingOCR
-                            ? 'bg-red-500/20 text-red-500 ring-1 ring-red-500/30'
-                            : 'bg-slate-800 text-slate-400 hover:bg-emerald-600 hover:text-white'
+                            ? 'bg-rose-600 border-rose-500 text-white'
+                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:bg-emerald-600 hover:text-white hover:border-emerald-500'
                         }`}
                       title={!doc.content_text ? "Extraer texto (re-indexar)" : "Lectura inteligente"}
                     >
-                      {doc.indexing ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
+                      {doc.indexing ? <RotateCcw className="w-5 h-5 animate-spin" /> : (isSpeakingOCR ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />)}
                     </button>
                   </div>
                 </motion.div>
@@ -254,14 +278,19 @@ export default function ConsultaPage() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center py-20 text-center gap-4"
+              className="flex flex-col items-center justify-center py-32 text-center gap-8"
             >
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl opacity-50">
-                <Search className="w-12 h-12 text-slate-700" />
+              <div className="relative">
+                <div className="absolute inset-0 bg-slate-800 blur-3xl opacity-20 rounded-full" />
+                <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2.5rem] relative z-10 shadow-2xl">
+                  <Search className="w-16 h-16 text-slate-800" />
+                </div>
               </div>
-              <div>
-                <p className="text-slate-400 text-sm font-medium uppercase tracking-widest">No encontramos registros técnicos para "{query}"</p>
-                <p className="text-[10px] text-slate-600 mt-2 uppercase tracking-tight">Intenta con palabras clave más generales...</p>
+              <div className="space-y-3">
+                <p className="text-slate-400 text-sm md:text-base font-black uppercase tracking-[0.2em]">Cero Coincidencias en el Radar</p>
+                <p className="text-[10px] text-slate-600 uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
+                  El término "{query}" no está en el núcleo de memoria. Prueba con descriptores de hardware o códigos de error.
+                </p>
               </div>
             </motion.div>
           )}

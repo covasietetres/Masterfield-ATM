@@ -48,373 +48,64 @@ export default function KnowledgeBasePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-    if (typeof window !== 'undefined') {
-      synthRef.current = window.speechSynthesis;
-    }
-  }, []);
-
-  // Reset OCR mode when document changes
-  useEffect(() => {
-    setOcrMode(false);
-    stopSpeaking();
-  }, [selectedDoc]);
-
-  const stopSpeaking = () => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
-      setIsSpeaking(false);
-    }
-  };
-
-  const speakOCR = (text: string) => {
-    if (!synthRef.current || !text) return;
-    stopSpeaking();
-
-    // Pure OCR cleanup: only remove markdown symbols, preserve all text
-    const cleanText = text
-      .replace(/[*#_`|\\]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    if (!cleanText) return;
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = 'es-ES';
-    utterance.rate = 0.95;   // Slightly slower for clarity in OCR mode
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    synthRef.current.speak(utterance);
-  };
-
-  const compressImage = (file: File): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1200;
-          const MAX_HEIGHT = 1200;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          
-          canvas.toBlob(
-            (blob) => {
-              if (blob) resolve(blob);
-              else reject(new Error('Error al comprimir imagen'));
-            },
-            'image/jpeg',
-            0.7 // 70% quality
-          );
-        };
-      };
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
-  const handleExperienceImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setExperienceImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const fetchDocuments = async () => {
-    const { data, error } = await supabase
-      .from('knowledge_documents')
-      .select('*, knowledge_chunks(count)')
-      .order('created_at', { ascending: false });
-    if (!error && data) setDocuments(data);
-  };
-
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setSuccess(false);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!file) return;
-    setUploading(true);
-    setSuccess(false);
-
-    try {
-      const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
-      let fileType = 'pdf';
-      let bucket = 'manuals';
-
-      if (['png', 'jpg', 'jpeg'].includes(fileExt)) {
-        fileType = 'image';
-        bucket = 'media';
-      } else if (['mp4', 'webm'].includes(fileExt)) {
-        fileType = 'video';
-        bucket = 'media';
-      } else if (fileExt !== 'pdf') {
-        throw new Error('Formato no soportado. Por favor sube PDF, Imagen o Video.');
-      }
-
-      const fileName = `${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = bucket === 'media' ? `uploads/${fileName}` : `${fileName}`;
-
-      const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file);
-      if (uploadError) throw new Error(`Error de subida: ${uploadError.message}`);
-
-      const { data: userData } = await supabase.auth.getUser();
-      const { data: docData, error: dbError } = await supabase
-        .from('knowledge_documents')
-        .insert({
-          title: file.name,
-          file_type: fileType,
-          brand: 'General',
-          storage_path: filePath,
-          uploaded_by: userData.user?.email || 'Usuario'
-        })
-        .select()
-        .single();
-
-      if (dbError || !docData) throw new Error(`Error en registro: ${dbError?.message}`);
-
-      const indexSuccess = await handleReindex(docData, bucket);
-      
-      if (indexSuccess) {
-        setSuccess(true);
-        setFile(null);
-      } else {
-        alert("Documento guardado, pero el procesamiento de IA falló. Puedes intentar re-indexar manualmente más tarde.");
-      }
-      
-      fetchDocuments();
-    } catch (error: any) {
-      alert(error.message || 'Error al subir archivo.');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleReindex = async (doc: KnowledgeDocument, bucket?: string): Promise<boolean> => {
-    const targetBucket = bucket || (doc.file_type === 'pdf' ? 'manuals' : 'media');
-    try {
-      setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, indexing: true } : d));
-
-      const res = await fetch('/api/ingest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          documentId: doc.id,
-          bucket: targetBucket,
-          path: doc.storage_path,
-          fileType: doc.file_type,
-          title: doc.title
-        })
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Falla en el motor de ingesta');
-      }
-
-      await fetchDocuments();
-
-      if (selectedDoc?.id === doc.id) {
-        const { data: updatedDoc } = await supabase
-          .from('knowledge_documents')
-          .select('*')
-          .eq('id', doc.id)
-          .single();
-        if (updatedDoc) setSelectedDoc(updatedDoc);
-      }
-      return true;
-    } catch (error: any) {
-      alert('Error de indexación: ' + error.message);
-      return false;
-    } finally {
-      setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, indexing: false } : d));
-    }
-  };
-
-  const handleShareExperience = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!experienceForm.description || !experienceForm.engineerName) {
-      alert('Por favor completa los campos obligatorios.');
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      let imageUrl = '';
-      let imageFilePath = '';
-
-      // 1. Handle Image Upload if exists
-      if (experienceImage) {
-        const compressedBlob = await compressImage(experienceImage);
-        const fileExt = 'jpg';
-        const fileName = `exp_${Date.now()}.${fileExt}`;
-        imageFilePath = `uploads/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage.from('media').upload(imageFilePath, compressedBlob);
-        if (uploadError) throw new Error(`Error subiendo imagen: ${uploadError.message}`);
-
-        const { data: publicData } = supabase.storage.from('media').getPublicUrl(imageFilePath);
-        imageUrl = publicData.publicUrl;
-
-        // Register image as its own document for AI indexing
-        await supabase.from('knowledge_documents').insert({
-          title: `Imagen: ${experienceForm.faultType || 'Evidencia técnica'}`,
-          file_type: 'image',
-          brand: experienceForm.brand,
-          storage_path: imageFilePath,
-          uploaded_by: experienceForm.engineerName
-        });
-      }
-
-      // 2. Generate PDF Report
-      const doc = new jsPDF();
-      doc.setFontSize(22);
-      doc.setTextColor(30, 41, 59);
-      doc.text("ATM FIELD MASTER - REPORTE TÉCNICO", 20, 30);
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text("DATOS DEL CASO:", 20, 50);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Cajero: ${experienceForm.brand} ${experienceForm.model}`, 20, 60);
-      doc.text(`Falla: ${experienceForm.faultType}`, 20, 70);
-      doc.text(`Ubicación: ${experienceForm.location}`, 20, 80);
-      doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 90);
-      doc.text(`Colaborador: ${experienceForm.engineerName}`, 20, 100);
-      
-      if (imageUrl) {
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(59, 130, 246);
-        doc.text("EVIDENCIA ADJUNTA: SI (Ver en sistema)", 20, 110);
-        doc.setTextColor(30, 41, 59);
-      }
-
-      doc.setFont("helvetica", "bold");
-      doc.text("EXPERIENCIA COMPARTIDA:", 20, 125);
-      doc.setFont("helvetica", "normal");
-      const splitText = doc.splitTextToSize(experienceForm.description, 170);
-      doc.text(splitText, 20, 135);
-
-      const pdfBlob = doc.output('blob');
-      const pdfFileName = `experience_${Date.now()}.pdf`;
-
-      const { error: pdfUploadError } = await supabase.storage.from('manuals').upload(pdfFileName, pdfBlob);
-      if (pdfUploadError) throw pdfUploadError;
-
-      const { data: docData, error: dbError } = await supabase
-        .from('knowledge_documents')
-        .insert({
-          title: `Reporte Técnico: ${experienceForm.faultType || 'Experiencia de Campo'}`,
-          file_type: 'pdf',
-          brand: experienceForm.brand,
-          storage_path: pdfFileName,
-          uploaded_by: experienceForm.engineerName
-        })
-        .select()
-        .single();
-
-      if (dbError) throw dbError;
-
-      await handleReindex(docData, 'manuals');
-      
-      alert('¡Gracias! Tu experiencia e imagen han sido documentadas y compartidas.');
-      
-      setExperienceForm({ brand: 'NCR', model: '', faultType: '', location: '', description: '', engineerName: '' });
-      setExperienceImage(null);
-      setImagePreview(null);
-      fetchDocuments();
-    } catch (error: any) {
-      alert('Error: ' + error.message);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const getPublicUrl = (doc: KnowledgeDocument) => {
-    const bucket = doc.file_type === 'pdf' ? 'manuals' : 'media';
-    const { data } = supabase.storage.from(bucket).getPublicUrl(doc.storage_path);
-    return data.publicUrl;
-  };
-
-  const handleDelete = async (doc: KnowledgeDocument) => {
-    if (!window.confirm(`¿Eliminar permanentemente "${doc.title}"?`)) return;
-
-    try {
-      const bucket = doc.file_type === 'pdf' ? 'manuals' : 'media';
-      await supabase.from('knowledge_chunks').delete().eq('document_id', doc.id);
-      const { error: dbError } = await supabase.from('knowledge_documents').delete().eq('id', doc.id);
-      if (dbError) throw dbError;
-      await supabase.storage.from(bucket).remove([doc.storage_path]);
-      alert('Documento eliminado correctamente.');
-      fetchDocuments();
-    } catch (error: any) {
-      alert('Error al eliminar: ' + error.message);
-    }
-  };
+  const [activeTab, setActiveTab] = useState<'upload' | 'experience'>('upload');
 
   return (
-    <div suppressHydrationWarning className="max-w-6xl mx-auto space-y-8">
-      <header className="mb-8 border-b border-slate-800 pb-6">
-        <h1 className="text-3xl font-bold text-white tracking-wider uppercase flex items-center gap-3">
-          <Database className="text-blue-500" />
-          Base de Conocimiento Técnico
-        </h1>
-        <p className="mt-2 text-slate-400 text-sm tracking-wide">
-          Gestiona manuales y experiencias colaborativas de campo.
-        </p>
+    <div suppressHydrationWarning className="max-w-6xl mx-auto space-y-6 md:space-y-10 pb-10">
+      <header className="mb-4 md:mb-10 border-b border-slate-800 pb-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="flex items-center gap-5 relative z-10">
+          <div className="p-4 bg-blue-600 rounded-3xl shadow-2xl shadow-blue-600/20">
+            <Database className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-4xl font-black text-white tracking-tighter uppercase">
+              Central de Inteligencia
+            </h1>
+            <p className="text-[10px] md:text-sm text-slate-500 uppercase font-black tracking-[0.2em] mt-1">
+              Manuales Técnicos y Experiencias de Campo
+            </p>
+          </div>
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Column 1: Ingestion */}
-        <div className="space-y-8">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
-            <h2 className="text-xl font-bold text-slate-200 uppercase tracking-wide mb-6 flex items-center gap-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12">
+        {/* Mobile Tabs Selector */}
+        <div className="lg:hidden flex p-1 bg-slate-900 rounded-2xl border border-slate-800 shadow-inner">
+          <button 
+            onClick={() => setActiveTab('upload')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'upload' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}
+          >
+            <Upload className="w-4 h-4" /> Manuales
+          </button>
+          <button 
+            onClick={() => setActiveTab('experience')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'experience' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-500'}`}
+          >
+            <PenTool className="w-4 h-4" /> Experiencias
+          </button>
+        </div>
+
+        {/* Column 1: Forms (Responsive Tabs) */}
+        <div className="space-y-8 lg:block">
+          {/* Ingest Manuals */}
+          <div className={`${activeTab !== 'upload' ? 'hidden lg:block' : 'block'} bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden group`}>
+            <div className="absolute top-0 left-0 w-32 h-32 bg-blue-500/5 blur-3xl rounded-full -translate-y-1/2 -translate-x-1/2" />
+            
+            <h2 className="text-xs font-black text-slate-100 uppercase tracking-[0.2em] mb-8 flex items-center gap-3 relative z-10">
               <Upload className="w-5 h-5 text-blue-400" />
-              Ingestar Manuales
+              Ingestar Conocimiento
             </h2>
-            <div className="space-y-6">
+
+            <div className="space-y-6 relative z-10">
               <div className="flex items-center justify-center w-full">
-                <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-48 border-2 border-slate-700 border-dashed rounded-lg cursor-pointer bg-slate-950 hover:bg-slate-900 hover:border-blue-500 transition-colors">
+                <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-52 border-2 border-slate-800 border-dashed rounded-3xl cursor-pointer bg-slate-950 hover:bg-slate-900 hover:border-blue-500/50 transition-all group/drop">
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <Upload className="w-8 h-8 mb-3 text-slate-500" />
-                    <p className="mb-2 text-xs text-slate-400 text-center px-4">
-                      <span className="font-semibold text-blue-400">PDF, Imagen o Video</span>
+                    <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 border border-slate-800 group-hover/drop:scale-110 group-hover/drop:bg-blue-600 transition-all">
+                      <Upload className="w-8 h-8 text-slate-500 group-hover/drop:text-white" />
+                    </div>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center px-6">
+                      Suelte <span className="text-blue-400">PDF, JPG o MP4</span> aquí
                     </p>
                   </div>
                   <input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} />
@@ -422,148 +113,155 @@ export default function KnowledgeBasePage() {
               </div>
 
               {file && (
-                <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg border border-slate-700">
-                  <span className="text-xs text-slate-300 truncate max-w-[150px]">{file.name}</span>
-                  <span className="text-[10px] text-slate-500 shrink-0">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
-                </div>
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between p-4 bg-blue-600/5 rounded-2xl border border-blue-500/20">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <FileText className="w-5 h-5 text-blue-400 shrink-0" />
+                    <span className="text-[10px] font-bold text-slate-300 truncate">{file.name}</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-slate-500 shrink-0">{(file.size / 1024 / 1024).toFixed(1)}MB</span>
+                </motion.div>
               )}
 
               <button
                 onClick={handleUpload}
                 disabled={!file || uploading}
-                className={`w-full py-3 px-4 rounded-lg font-bold text-xs uppercase tracking-wider transition-colors ${
-                  !file || uploading ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'
+                className={`w-full py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-2xl active:scale-95 ${
+                  !file || uploading ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/40'
                 }`}
               >
-                {uploading ? 'Ingestando vía IA...' : 'Subir y Procesar'}
+                {uploading ? 'Procesando con IA...' : 'Ejecutar Ingesta'}
               </button>
 
-              {success && (
-                <div className="flex items-center justify-center gap-2 text-emerald-400 text-[10px] bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
-                  <CheckCircle className="w-4 h-4" />
-                  Indexado correctamente.
-                </div>
-              )}
+              <AnimatePresence>
+                {success && (
+                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="flex items-center justify-center gap-2 text-emerald-400 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/20 shadow-xl shadow-emerald-500/5">
+                    <CheckCircle className="w-5 h-5" />
+                    ¡Sincronización Exitosa!
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
-            <h2 className="text-xl font-bold text-slate-200 uppercase tracking-wide mb-6 flex items-center gap-2">
+          {/* Share Experience */}
+          <div className={`${activeTab !== 'experience' ? 'hidden lg:block' : 'block'} bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden group`}>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
+            
+            <h2 className="text-xs font-black text-slate-100 uppercase tracking-[0.2em] mb-8 flex items-center gap-3 relative z-10">
               <PenTool className="w-5 h-5 text-amber-500" />
-              Compartir Experiencia
+              Bitácora de Campo
             </h2>
-            <form onSubmit={handleShareExperience} className="space-y-4">
+
+            <form onSubmit={handleShareExperience} className="space-y-5 relative z-10">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 uppercase font-bold px-1">Marca</label>
-                  <select value={experienceForm.brand} onChange={e => setExperienceForm({...experienceForm, brand: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500">
-                    <option>NCR</option><option>Diebold</option><option>GRG</option>
+                <div className="space-y-2">
+                  <label className="text-[9px] text-slate-500 uppercase font-black tracking-widest px-1">Marca</label>
+                  <select value={experienceForm.brand} onChange={e => setExperienceForm({...experienceForm, brand: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-[10px] font-bold text-white focus:outline-none focus:border-amber-500 transition-all appearance-none">
+                    <option>NCR</option><option>Diebold</option><option>GRG</option><option>General</option>
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 uppercase font-bold px-1">Modelo</label>
-                  <input type="text" placeholder="ej. 6622" value={experienceForm.model} onChange={e => setExperienceForm({...experienceForm, model: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500" />
+                <div className="space-y-2">
+                  <label className="text-[9px] text-slate-500 uppercase font-black tracking-widest px-1">Modelo</label>
+                  <input type="text" placeholder="ej. 6622" value={experienceForm.model} onChange={e => setExperienceForm({...experienceForm, model: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-[10px] font-bold text-white focus:outline-none focus:border-amber-500 transition-all placeholder:text-slate-800" />
                 </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 uppercase font-bold px-1">Tipo de Falla</label>
-                <div className="relative">
-                  <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
-                  <input type="text" placeholder="ej. Error 12 de Dispensador" value={experienceForm.faultType} onChange={e => setExperienceForm({...experienceForm, faultType: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 pl-9 text-xs text-white focus:outline-none focus:border-amber-500" />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 uppercase font-bold px-1">Ubicación / Sitio</label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
-                  <input type="text" placeholder="ej. Sucursal Bancaria 402" value={experienceForm.location} onChange={e => setExperienceForm({...experienceForm, location: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 pl-9 text-xs text-white focus:outline-none focus:border-amber-500" />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 uppercase font-bold px-1">Experiencia Técnica</label>
-                <textarea rows={4} placeholder="Describe qué encontraste y cómo lo solucionaste..." value={experienceForm.description} onChange={e => setExperienceForm({...experienceForm, description: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500 resize-none" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 uppercase font-bold px-1">Nombre del Ingeniero (Crédito)</label>
-                <input type="text" placeholder="Tu Nombre" value={experienceForm.engineerName} onChange={e => setExperienceForm({...experienceForm, engineerName: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500" />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] text-slate-500 uppercase font-bold px-1">Evidencia Visual (Imagen comprimida)</label>
-                <div className="flex flex-col gap-3">
-                  {imagePreview ? (
-                    <div className="relative w-full h-32 rounded-lg overflow-hidden border border-slate-700 bg-slate-950">
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                      <button 
-                        type="button"
-                        onClick={() => { setExperienceImage(null); setImagePreview(null); }}
-                        className="absolute top-2 right-2 p-1 bg-rose-600 rounded-full text-white hover:bg-rose-500 transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-slate-800 border-dashed rounded-lg cursor-pointer bg-slate-950 hover:bg-slate-900 transition-colors">
-                      <div className="flex flex-center gap-2">
-                        <Camera className="w-4 h-4 text-slate-500" />
-                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Tomar foto o subir imagen</span>
-                      </div>
-                      <input type="file" accept="image/*" className="hidden" onChange={handleExperienceImageChange} />
-                    </label>
-                  )}
+                <label className="text-[9px] text-slate-500 uppercase font-black tracking-widest px-1">Tipología de Error</label>
+                <div className="relative">
+                  <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+                  <input type="text" placeholder="ej. Error 12 Pick Line" value={experienceForm.faultType} onChange={e => setExperienceForm({...experienceForm, faultType: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 pl-12 text-[10px] font-bold text-white focus:outline-none focus:border-amber-500 transition-all placeholder:text-slate-800" />
                 </div>
               </div>
-              <button type="submit" disabled={isGenerating} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-lg text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2">
+              <div className="space-y-2">
+                <label className="text-[9px] text-slate-500 uppercase font-black tracking-widest px-1">Relato Técnico</label>
+                <textarea rows={4} placeholder="Protocolo de solución paso a paso..." value={experienceForm.description} onChange={e => setExperienceForm({...experienceForm, description: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-[10px] font-bold text-white focus:outline-none focus:border-amber-500 transition-all resize-none placeholder:text-slate-800" />
+              </div>
+              
+              <div className="space-y-3">
+                <label className="text-[9px] text-slate-500 uppercase font-black tracking-widest px-1">Evidencia Visual</label>
+                {imagePreview ? (
+                  <div className="relative w-full h-40 rounded-3xl overflow-hidden border border-slate-800 shadow-2xl">
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <button 
+                      type="button"
+                      onClick={() => { setExperienceImage(null); setImagePreview(null); }}
+                      className="absolute top-3 right-3 p-2 bg-rose-600 rounded-xl text-white hover:bg-rose-500 transition-all shadow-xl active:scale-90"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-slate-800 border-dashed rounded-3xl cursor-pointer bg-slate-950 hover:bg-slate-900 transition-all group/cam">
+                    <div className="flex items-center gap-3">
+                      <Camera className="w-5 h-5 text-slate-600 group-hover/cam:text-amber-400 group-hover/cam:scale-110 transition-all" />
+                      <span className="text-[9px] text-slate-600 font-black uppercase tracking-widest">Capturar Evidencia</span>
+                    </div>
+                    <input type="file" accept="image/*" className="hidden" onChange={handleExperienceImageChange} />
+                  </label>
+                )}
+              </div>
+
+              <button type="submit" disabled={isGenerating} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black py-5 px-6 rounded-2xl text-[10px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-amber-900/40 active:scale-95 flex items-center justify-center gap-3">
                 {isGenerating ? (
                   <>
-                    <RotateCcw className="w-4 h-4 animate-spin" />
-                    Procesando...
+                    <RotateCcw className="w-5 h-5 animate-spin" />
+                    Sincronizando...
                   </>
-                ) : 'Subir Experiencia'}
+                ) : 'Publicar en el Corpus'}
               </button>
             </form>
           </div>
         </div>
 
         {/* Column 2: Document List */}
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg flex flex-col h-[800px]">
-          <h2 className="text-xl font-bold text-slate-200 uppercase tracking-wide mb-6 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-emerald-500" />
-            Corpus Técnico
+        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-10 shadow-2xl flex flex-col h-[600px] md:h-[800px] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2" />
+          
+          <h2 className="text-xs font-black text-slate-100 uppercase tracking-[0.2em] mb-10 flex items-center gap-4 relative z-10">
+            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50" />
+            Repositorio Técnico Central
           </h2>
-          <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+
+          <div className="space-y-4 flex-1 overflow-y-auto pr-3 custom-scrollbar relative z-10">
             {documents.length === 0 ? (
-              <p className="text-slate-500 text-sm text-center py-8 italic">Núcleo de memoria vacío. Esperando registros.</p>
+              <div className="h-full flex flex-col items-center justify-center opacity-20 space-y-4">
+                <FileText className="w-16 h-16 text-slate-400" />
+                <p className="text-[10px] font-black uppercase tracking-[0.3em]">Base de datos offline</p>
+              </div>
             ) : (
               documents.map((doc) => (
-                <div key={doc.id} className="p-4 bg-slate-950 border border-slate-800 rounded-lg flex flex-wrap sm:flex-nowrap items-start gap-4 hover:border-slate-700 transition-all group">
-                  <div className={`p-3 rounded-lg flex-shrink-0 ${doc.file_type === 'pdf' ? 'bg-blue-500/10' : 'bg-amber-500/10'}`}>
-                    <FileText className={`w-6 h-6 ${doc.file_type === 'pdf' ? 'text-blue-400' : 'text-amber-500'}`} />
+                <div key={doc.id} className="p-5 bg-slate-950/50 border border-slate-800/80 rounded-3xl flex flex-col sm:flex-row items-center gap-6 hover:border-slate-600 transition-all group backdrop-blur-sm relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                    {doc.file_type === 'pdf' ? <FileText className="w-20 h-20" /> : <ImageIcon className="w-20 h-20" />}
                   </div>
-                  <div className="overflow-hidden flex-1 min-w-[200px] w-full sm:w-auto">
-                    <h4 className="text-sm font-bold text-slate-100 truncate pr-4 uppercase tracking-tight">{doc.title}</h4>
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2">
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full uppercase font-black tracking-tighter shadow-sm ${
+
+                  <div className={`p-4 rounded-2xl flex-shrink-0 shadow-xl ${doc.file_type === 'pdf' ? 'bg-blue-600/10 border border-blue-500/20' : 'bg-amber-600/10 border border-amber-500/20'}`}>
+                    {doc.file_type === 'pdf' ? <FileText className="w-6 h-6 text-blue-400" /> : <ImageIcon className="w-6 h-6 text-amber-500" />}
+                  </div>
+
+                  <div className="flex-1 w-full text-center sm:text-left overflow-hidden">
+                    <h4 className="text-xs md:text-sm font-black text-slate-100 truncate pr-0 md:pr-10 uppercase tracking-tight group-hover:text-blue-400 transition-colors">{doc.title}</h4>
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-3">
+                      <span className={`text-[8px] px-2 py-1 rounded-lg uppercase font-black tracking-widest shadow-sm border ${
                         (doc.knowledge_chunks?.[0]?.count || 0) > 0
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-slate-800 text-slate-500 border border-slate-700'
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                          : 'bg-slate-800 text-slate-500 border-slate-700'
                       }`}>
-                        {(doc.knowledge_chunks?.[0]?.count || 0) > 0 ? 'Indexado' : 'Procesando'}
+                        {(doc.knowledge_chunks?.[0]?.count || 0) > 0 ? 'ACTIVO (IA)' : 'PROCESANDO'}
                       </span>
-                      <p className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
-                        {doc.knowledge_chunks?.[0]?.count || 0} frag. • Por: <span className="text-slate-300 truncate max-w-[80px] sm:max-w-[120px] inline-block align-bottom">{doc.uploaded_by}</span>
+                      <p className="text-[9px] text-slate-500 font-black uppercase tracking-tighter">
+                        <span className="text-slate-300">{(doc.knowledge_chunks?.[0]?.count || 0)} Frag.</span> • {doc.uploaded_by}
                       </p>
-                      <span className="text-[10px] text-slate-600 sm:ml-auto">{new Date(doc.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <div className="flex gap-2 w-full sm:w-auto justify-end opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all sm:translate-x-4 group-hover:translate-x-0 mt-1 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-slate-800/50">
-                    <button onClick={() => handleReindex(doc)} disabled={doc.indexing} className={`flex-1 sm:flex-none flex justify-center p-2 rounded-lg text-slate-300 hover:text-white transition-all shadow-lg ${doc.indexing ? 'bg-blue-600 animate-pulse' : 'bg-slate-800 hover:bg-emerald-600'}`} title="Forzar Re-indexado IA">
-                      <RotateCcw className={`w-4 h-4 ${doc.indexing ? 'animate-spin' : ''}`} />
+
+                  <div className="flex gap-3 w-full sm:w-auto justify-center opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all sm:translate-x-4 group-hover:translate-x-0 relative z-20">
+                    <button onClick={() => setSelectedDoc(doc)} className="flex-1 sm:flex-none p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all shadow-xl shadow-blue-900/20 active:scale-90" title="Visualizar">
+                      <Eye className="w-5 h-5" />
                     </button>
-                    <button onClick={() => setSelectedDoc(doc)} className="flex-1 sm:flex-none flex justify-center p-2 bg-slate-800 hover:bg-blue-600 rounded-lg text-slate-300 hover:text-white transition-all shadow-lg" title="Ver">
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDelete(doc)} className="flex-1 sm:flex-none flex justify-center p-2 bg-slate-800 hover:bg-rose-600 rounded-lg text-slate-300 hover:text-white transition-all shadow-lg" title="Eliminar">
-                      <Trash2 className="w-4 h-4" />
+                    <button onClick={() => handleDelete(doc)} className="flex-1 sm:flex-none p-3 bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white rounded-xl transition-all shadow-xl active:scale-90" title="Eliminar">
+                      <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
@@ -573,7 +271,7 @@ export default function KnowledgeBasePage() {
         </div>
       </div>
 
-      {/* === DOCUMENT VIEWER MODAL === */}
+      {/* === DOCUMENT VIEWER MODAL (MOBILE OPTIMIZED) === */}
       <AnimatePresence>
         {mounted && selectedDoc && (
           <motion.div
@@ -582,136 +280,75 @@ export default function KnowledgeBasePage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             suppressHydrationWarning
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-center justify-center sm:p-4 bg-slate-950/95 backdrop-blur-xl"
             onClick={() => { setSelectedDoc(null); setOcrMode(false); stopSpeaking(); }}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-900 border border-slate-700 w-full max-w-6xl h-[90vh] rounded-2xl overflow-hidden flex flex-col shadow-2xl"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="bg-slate-900 w-full h-full sm:h-[90vh] sm:max-w-6xl sm:rounded-3xl overflow-hidden flex flex-col shadow-2xl border-t border-slate-800 sm:border"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 border-b border-slate-800 bg-slate-950 flex-shrink-0 gap-3">
-                <div className="flex items-start justify-between w-full sm:w-auto gap-4">
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="bg-blue-500/10 p-2 rounded shrink-0">
-                      <FileText className="w-5 h-5 text-blue-400" />
-                    </div>
-                    <div className="overflow-hidden">
-                      <h3 className="text-white font-bold text-sm truncate max-w-[200px] sm:max-w-md">{selectedDoc.title}</h3>
-                      <p className="text-[10px] text-slate-500 uppercase tracking-wider">Documento {selectedDoc.file_type}</p>
-                    </div>
+              <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-950 flex-shrink-0">
+                <div className="flex items-center gap-4 overflow-hidden">
+                  <div className={`p-2 rounded-xl shrink-0 ${selectedDoc.file_type === 'pdf' ? 'bg-blue-600' : 'bg-amber-600'}`}>
+                    <FileText className="w-5 h-5 text-white" />
                   </div>
-                  
-                  {/* Close button for MOBILE */}
-                  <button
-                    suppressHydrationWarning
-                    onClick={() => { setSelectedDoc(null); setOcrMode(false); stopSpeaking(); }}
-                    className="sm:hidden p-1 -mr-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors shrink-0"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
+                  <div className="overflow-hidden">
+                    <h3 className="text-white font-black text-[10px] uppercase tracking-widest truncate">{selectedDoc.title}</h3>
+                    <p className="text-[9px] text-slate-500 font-bold uppercase">{selectedDoc.brand} • {selectedDoc.file_type}</p>
+                  </div>
                 </div>
-
-                <div suppressHydrationWarning className="flex flex-wrap sm:flex-nowrap items-center gap-2">
-                  {/* OCR Buttons - show if content_text exists */}
-                  {selectedDoc.content_text && (
-                    <button
-                      suppressHydrationWarning
-                      onClick={() => isSpeaking ? stopSpeaking() : speakOCR(selectedDoc.content_text || '')}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border flex-1 sm:flex-none justify-center ${
-                        isSpeaking
-                          ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30'
-                          : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
-                      }`}
-                    >
-                      {isSpeaking ? <VolumeX className="w-4 h-4 shrink-0" /> : <Volume2 className="w-4 h-4 shrink-0" />}
-                      <span suppressHydrationWarning className="truncate">{isSpeaking ? 'Detener Lectura' : 'Lectura Inteligente'}</span>
-                    </button>
-                  )}
-
-                  {/* Close button for DESKTOP */}
-                  <button
-                    suppressHydrationWarning
-                    onClick={() => { setSelectedDoc(null); setOcrMode(false); stopSpeaking(); }}
-                    className="hidden sm:block p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors shrink-0 ml-auto"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
+                
+                <button
+                  suppressHydrationWarning
+                  onClick={() => { setSelectedDoc(null); setOcrMode(false); stopSpeaking(); }}
+                  className="p-3 bg-slate-800 rounded-2xl text-slate-400 hover:text-white transition-colors active:scale-90"
+                >
+                  <X className="w-6 h-6" />
+                </button>
               </div>
 
-              {/* Modal Body: document viewer + optional OCR panel */}
-              <div className="flex-1 flex overflow-hidden">
-
-                {/* Left: Document Viewer */}
-                <div className={`transition-all duration-300 bg-slate-950 relative overflow-hidden ${ocrMode ? 'w-1/2' : 'w-full'}`}>
+              {/* Modal Body */}
+              <div className="flex-1 flex flex-col sm:flex-row overflow-hidden bg-slate-950 relative">
+                {/* Document Area */}
+                <div className={`flex-1 relative overflow-hidden transition-all duration-500 ${ocrMode ? 'hidden sm:block sm:w-1/2' : 'w-full'}`}>
                   {selectedDoc.file_type === 'pdf' ? (
                     <iframe
                       suppressHydrationWarning
                       src={`https://docs.google.com/viewer?url=${encodeURIComponent(getPublicUrl(selectedDoc))}&embedded=true`}
-                      className="w-full h-full border-none"
+                      className="w-full h-full border-none invert brightness-90 contrast-125"
                       title={selectedDoc.title}
                     />
-                  ) : selectedDoc.file_type === 'image' ? (
-                    <div suppressHydrationWarning className="w-full h-full flex items-center justify-center p-8 overflow-auto">
-                      <img suppressHydrationWarning src={getPublicUrl(selectedDoc)} alt={selectedDoc.title} className="max-w-full max-h-full object-contain rounded-lg shadow-xl" />
-                    </div>
-                  ) : selectedDoc.file_type === 'video' ? (
-                    <div suppressHydrationWarning className="w-full h-full flex items-center justify-center p-4">
-                      <video suppressHydrationWarning src={getPublicUrl(selectedDoc)} controls className="max-w-full max-h-full rounded-lg shadow-xl" />
-                    </div>
                   ) : (
-                    <div suppressHydrationWarning className="w-full h-full flex items-center justify-center text-slate-500">
-                      Visor no disponible para este tipo de archivo.
+                    <div suppressHydrationWarning className="w-full h-full flex items-center justify-center p-4">
+                      <img suppressHydrationWarning src={getPublicUrl(selectedDoc)} alt={selectedDoc.title} className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl" />
                     </div>
                   )}
                 </div>
 
-                {/* Right: OCR Reading Panel */}
+                {/* OCR Area (Full Screen on Mobile if active) */}
                 {ocrMode && (
-                  <div className="w-1/2 border-l border-slate-800 flex flex-col bg-slate-950">
-                    {/* OCR Panel Header */}
-                    <div className="flex items-center justify-between p-3 border-b border-slate-800 bg-slate-900 flex-shrink-0">
-                      <div className="flex items-center gap-2">
-                        <AlignLeft className="w-4 h-4 text-amber-400" />
-                        <span className="text-xs font-black text-amber-400 uppercase tracking-widest">Texto Extraído (OCR)</span>
+                  <div className="w-full sm:w-1/2 border-l border-slate-800 flex flex-col bg-slate-900 animate-in slide-in-from-right duration-300">
+                    <div className="flex items-center justify-between p-4 border-b border-slate-800">
+                      <div className="flex items-center gap-3">
+                        <AlignLeft className="w-5 h-5 text-amber-500" />
+                        <span className="text-[10px] font-black text-white uppercase tracking-widest">Transcripción de IA</span>
                       </div>
-                      <button
-                        suppressHydrationWarning
-                        onClick={() => isSpeaking ? stopSpeaking() : speakOCR(selectedDoc.content_text || '')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border ${
-                          isSpeaking
-                            ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30'
-                            : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
-                        }`}
-                      >
-                        {isSpeaking ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                        <span suppressHydrationWarning>{isSpeaking ? 'Detener Lectura' : 'Leer en Voz Alta'}</span>
-                      </button>
+                      <button onClick={() => setOcrMode(false)} className="sm:hidden text-slate-500 font-bold text-xs">CERRAR</button>
                     </div>
-
-                    {/* OCR Text Content */}
-                    <div ref={ocrTextRef} className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    <div ref={ocrTextRef} className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
                       {selectedDoc.content_text ? (
-                        <p className="text-slate-300 text-xs leading-7 whitespace-pre-wrap font-mono tracking-wide">
+                        <p className="text-slate-300 text-sm md:text-base leading-loose whitespace-pre-wrap font-medium">
                           {selectedDoc.content_text}
                         </p>
                       ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-                          <BookOpen className="w-10 h-10 text-slate-700" />
-                          <div>
-                            <p className="text-slate-500 text-xs font-bold">Sin texto extraído aún</p>
-                            <p className="text-slate-600 text-[10px] mt-1">Usa el botón de re-indexado (↻) para procesar este archivo con el motor OCR.</p>
-                          </div>
-                          <button
-                            onClick={() => { handleReindex(selectedDoc); setSelectedDoc(null); setOcrMode(false); }}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors"
-                          >
-                            Procesar con OCR
-                          </button>
+                        <div className="h-full flex flex-col items-center justify-center text-center p-10 space-y-6">
+                          <RotateCcw className="w-12 h-12 text-slate-800 animate-spin" />
+                          <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Extrayendo datos estructurales...</p>
                         </div>
                       )}
                     </div>
@@ -719,19 +356,25 @@ export default function KnowledgeBasePage() {
                 )}
               </div>
 
-              {/* Footer */}
-              <div className="p-3 border-t border-slate-800 bg-slate-950 flex justify-between items-center flex-shrink-0">
-                <div className="text-[10px] text-slate-600 font-mono">
-                  ID: {selectedDoc.id.substring(0, 8)}...
-                </div>
-                <a
-                  href={getPublicUrl(selectedDoc)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-widest flex items-center gap-2"
+              {/* Modal Footer (Controls) */}
+              <div className="p-5 border-t border-slate-800 bg-slate-950 flex flex-col sm:flex-row items-center gap-4 flex-shrink-0 pb-10 sm:pb-5">
+                <button
+                  onClick={() => setOcrMode(!ocrMode)}
+                  className={`w-full sm:w-auto flex-1 flex items-center justify-center gap-3 py-4 sm:py-3 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${ocrMode ? 'bg-amber-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
                 >
-                  Abrir en pestaña nueva
-                </a>
+                  <AlignLeft className="w-5 h-5" />
+                  {ocrMode ? 'Ocultar Texto' : 'Ver Texto OCR'}
+                </button>
+                
+                {selectedDoc.content_text && (
+                  <button
+                    onClick={() => isSpeaking ? stopSpeaking() : speakOCR(selectedDoc.content_text || '')}
+                    className={`w-full sm:w-auto flex-1 flex items-center justify-center gap-3 py-4 sm:py-3 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${isSpeaking ? 'bg-rose-600 text-white shadow-xl animate-pulse' : 'bg-emerald-600 text-white shadow-xl shadow-emerald-900/40'}`}
+                  >
+                    {isSpeaking ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                    {isSpeaking ? 'Detener Voz' : 'Lectura Inteligente'}
+                  </button>
+                )}
               </div>
             </motion.div>
           </motion.div>

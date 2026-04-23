@@ -51,30 +51,35 @@ export function Sidebar() {
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="md:hidden fixed top-3 right-3 z-[60] p-2.5 bg-slate-800/95 backdrop-blur-sm border border-slate-700/80 rounded-xl text-slate-300 hover:text-white shadow-xl focus:outline-none"
+        className="md:hidden fixed top-4 right-4 z-[60] p-3 bg-blue-600 text-white rounded-2xl shadow-2xl shadow-blue-600/40 focus:outline-none active:scale-90 transition-all"
         aria-label="Toggle menu"
       >
         {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
 
       <div
-        className={`fixed inset-y-0 left-0 z-[50] w-64 bg-slate-900 border-r border-slate-800 transform transition-transform duration-300 ease-in-out flex flex-col ${
+        className={`fixed inset-y-0 left-0 z-[50] w-72 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 transform transition-transform duration-500 ease-out flex flex-col ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0`}
       >
-        <div className="flex flex-col items-center justify-center p-6 border-b border-slate-800 shrink-0 min-h-[140px]">
-          <div className="bg-blue-500/10 p-3 rounded-full mb-3 ring-1 ring-blue-500/30">
-            <Server className="w-6 h-6 text-blue-400" />
+        <div className="flex flex-col items-center justify-center p-8 border-b border-slate-800/50 shrink-0">
+          <div className="relative mb-4">
+            <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 animate-pulse" />
+            <div className="relative bg-gradient-to-br from-blue-500 to-cyan-600 p-4 rounded-3xl ring-1 ring-white/20 shadow-xl">
+              <Server className="w-7 h-7 text-white" />
+            </div>
           </div>
-          <h2 className="text-white font-bold tracking-widest text-sm uppercase" suppressHydrationWarning>ATM Field Master</h2>
+          <h2 className="text-white font-black tracking-[0.2em] text-xs uppercase" suppressHydrationWarning>ATM Field Master</h2>
           {userEmail && (
-            <p className="mt-2 text-xs text-slate-400 max-w-full truncate px-2 font-mono bg-slate-800/50 rounded py-1 border border-slate-700/50" title={userEmail}>
-              {userEmail}
-            </p>
+            <div className="mt-4 w-full px-4 py-2 bg-slate-800/50 rounded-xl border border-white/5 backdrop-blur-sm">
+              <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest text-center truncate">
+                {userEmail}
+              </p>
+            </div>
           )}
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+        <nav className="flex-1 px-4 py-8 space-y-3 overflow-y-auto custom-scrollbar">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -83,26 +88,26 @@ export function Sidebar() {
                 key={item.name}
                 href={item.href}
                 onClick={() => setIsOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-sm uppercase tracking-wide font-medium ${
+                className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all text-xs uppercase tracking-[0.1em] font-bold ${
                   isActive
-                    ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
                     : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                 }`}
               >
-                <Icon className="w-5 h-5 shrink-0" />
+                <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
                 {item.name}
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
+        <div className="p-6 border-t border-slate-800/50">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-colors uppercase tracking-wide font-medium"
+            className="flex items-center justify-center gap-3 w-full px-4 py-4 text-[10px] text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 rounded-2xl transition-all uppercase tracking-[0.2em] font-black border border-rose-500/10"
           >
-            <LogOut className="w-5 h-5" />
-            Cerrar Sesión
+            <LogOut className="w-4 h-4" />
+            Finalizar Turno
           </button>
         </div>
       </div>
@@ -110,7 +115,7 @@ export function Sidebar() {
       {/* Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-slate-950/80 z-[40] md:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-slate-950/90 z-[40] md:hidden backdrop-blur-md transition-opacity duration-500"
           onClick={() => setIsOpen(false)}
         />
       )}

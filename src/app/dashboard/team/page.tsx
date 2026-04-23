@@ -143,37 +143,30 @@ export default function TeamChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] bg-slate-950 rounded-xl border border-slate-800 overflow-hidden shadow-2xl relative">
+    <div className="flex flex-col h-[calc(100dvh-140px)] md:h-[calc(100vh-120px)] bg-slate-950 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl relative">
       {/* Header */}
-      <div className="bg-slate-900/50 p-4 border-b border-slate-800 flex items-center justify-between backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-500/10 rounded-lg">
-            <Radio className="w-5 h-5 text-blue-400 animate-pulse" />
+      <div className="bg-slate-900/80 p-4 md:p-6 border-b border-slate-800 flex items-center justify-between backdrop-blur-xl z-20">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/20">
+            <Radio className="w-5 h-5 text-white animate-pulse" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-100 tracking-tight flex items-center gap-2">
-              FRECUENCIA DE INGENIEROS
+            <h1 className="text-sm md:text-xl font-black text-white tracking-tighter md:tracking-tight uppercase">
+              Frecuencia Táctica
             </h1>
-            <p className="text-xs text-slate-400 flex items-center gap-1">
-              <Shield className="w-3 h-3 text-orange-500" />
-              Canal táctico efímero con soporte para transmisiones cifradas (privadas).
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+              <span className="text-[9px] md:text-xs text-slate-500 font-bold uppercase tracking-widest">
+                {isConnected ? 'Enlace Activo' : 'Desconectado'}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-4">
-          <div className={`px-2 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-medium flex items-center gap-1 md:gap-2 ${
-            isConnected ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
-          }`}>
-            <span className={`w-1.5 md:w-2 h-1.5 md:h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-            <span className="hidden sm:inline">{isConnected ? 'TRANSMITIENDO' : 'SIN SEÑAL'}</span>
-            <span className="sm:hidden">{isConnected ? 'ON' : 'OFF'}</span>
-          </div>
-
-          {/* Mobile Sidebar Toggle */}
+        <div className="flex items-center gap-3">
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="md:hidden p-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white"
+            className="md:hidden p-3 bg-slate-800 rounded-2xl text-slate-400 hover:text-white border border-slate-700/50 active:scale-90 transition-all"
           >
             <Users className="w-5 h-5" />
           </button>
@@ -183,40 +176,45 @@ export default function TeamChatPage() {
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden relative">
         {/* Messages List */}
-        <div className="flex-1 flex flex-col bg-slate-950/50">
+        <div className="flex-1 flex flex-col bg-slate-950/50 relative">
           <div 
             ref={scrollRef}
-            className="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth"
+            className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 scroll-smooth pb-32 md:pb-8 custom-scrollbar"
           >
             {messages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center opacity-20 text-slate-400 gap-4">
-                <Zap className="w-12 h-12" />
-                <p className="text-sm font-medium tracking-widest uppercase">Esperando transmisiones...</p>
+              <div className="h-full flex flex-col items-center justify-center opacity-20 text-slate-400 gap-6">
+                <div className="p-8 rounded-full bg-slate-900 border border-slate-800">
+                  <Zap className="w-12 h-12 text-blue-500" />
+                </div>
+                <p className="text-[10px] font-black tracking-[0.4em] uppercase text-center max-w-[200px] leading-relaxed">Sincronizando canal de voz...</p>
               </div>
             ) : (
               messages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.isSelf ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-2xl p-4 shadow-lg ${
+                  <div className={`max-w-[85%] md:max-w-[70%] rounded-3xl p-4 md:p-5 shadow-2xl relative group ${
                     msg.isSelf 
                       ? 'bg-blue-600 text-white rounded-tr-none' 
-                      : 'bg-slate-800 text-slate-100 border border-slate-700 rounded-tl-none'
+                      : 'bg-slate-900 text-slate-100 border border-slate-800 rounded-tl-none'
                   }`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">
+                    <div className={`flex items-center gap-2 mb-2 ${msg.isSelf ? 'justify-end' : 'justify-start'}`}>
+                      <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-60">
                         {msg.senderName}
                       </span>
-                      <span className="text-[10px] opacity-50">
+                      <span className="text-[8px] opacity-40 font-mono">
                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                     {msg.type === 'text' ? (
-                      <p className="text-sm leading-relaxed">{msg.text}</p>
+                      <p className="text-xs md:text-sm leading-relaxed font-medium">{msg.text}</p>
                     ) : (
-                      <div className="flex items-center gap-3 bg-black/20 p-2 rounded-xl border border-white/5">
-                        <div className="p-2 bg-white/10 rounded-full">
-                          <Volume2 className="w-4 h-4" />
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center gap-4 bg-black/20 p-3 rounded-2xl border border-white/5">
+                          <div className="p-3 bg-white/10 rounded-xl">
+                            <Volume2 className="w-4 h-4 text-white" />
+                          </div>
+                          <audio src={msg.audioData} controls className="h-8 w-full md:w-48 custom-audio invert" />
                         </div>
-                        <audio src={msg.audioData} controls className="h-8 w-48 custom-audio" />
+                        <span className="text-[8px] font-black uppercase tracking-widest opacity-40 italic">Transmisión de Voz</span>
                       </div>
                     )}
                   </div>
@@ -225,39 +223,70 @@ export default function TeamChatPage() {
             )}
           </div>
 
-          {/* Controls Bar */}
-          <div className="p-4 bg-slate-900/80 border-t border-slate-800 backdrop-blur-xl">
-            <div className="flex items-center gap-3 mb-3 px-1">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                <Shield className="w-3 h-3 text-blue-400" />
-                Transmitir a:
+          {/* Floating Push-to-Talk (MOBILE ONLY) */}
+          <div className="md:hidden absolute bottom-6 left-0 right-0 flex flex-col items-center gap-4 z-30 px-6">
+             <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 p-2 rounded-full shadow-2xl flex items-center gap-2 pr-4">
+                <select 
+                  value={targetUser}
+                  onChange={(e) => setTargetUser(e.target.value)}
+                  className="bg-slate-800 border-none text-blue-400 text-[9px] font-black rounded-full px-4 py-2 outline-none uppercase tracking-widest transition-all appearance-none text-center min-w-[120px]"
+                >
+                  <option value="ALL">Canal: ALL</option>
+                  {onlineUsers.map(user => (
+                    <option key={user} value={user}>Priv: {user}</option>
+                  ))}
+                </select>
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50" />
+             </div>
+
+             <button
+                onMouseDown={startRecording}
+                onMouseUp={stopRecording}
+                onMouseLeave={stopRecording}
+                onTouchStart={startRecording}
+                onTouchEnd={stopRecording}
+                className={`w-20 h-20 rounded-full transition-all shadow-2xl flex items-center justify-center border-4 ${
+                  isRecording 
+                    ? 'bg-rose-600 border-rose-400 scale-110 animate-pulse shadow-rose-600/40 text-white' 
+                    : 'bg-blue-600 border-blue-400 text-white shadow-blue-600/40 active:scale-95'
+                }`}
+              >
+                {isRecording ? <Zap className="w-8 h-8 fill-current" /> : <Mic className="w-8 h-8" />}
+              </button>
+              <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.4em]">Mantener para Hablar</p>
+          </div>
+
+          {/* Controls Bar (DESKTOP ONLY) */}
+          <div className="hidden md:block p-6 bg-slate-900/90 border-t border-slate-800 backdrop-blur-xl z-20">
+            <div className="flex items-center gap-6 mb-4 px-2">
+              <div className="flex items-center gap-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                <Shield className="w-4 h-4 text-blue-500" />
+                Destinatario de Señal:
               </div>
               <select 
                 value={targetUser}
                 onChange={(e) => setTargetUser(e.target.value)}
-                className="bg-slate-800 border-none text-blue-400 text-xs font-bold rounded-lg px-2 py-1 outline-none ring-1 ring-white/5 focus:ring-blue-500/50 transition-all cursor-pointer"
+                className="bg-slate-950 border border-slate-800 text-blue-400 text-[10px] font-black rounded-xl px-4 py-2 outline-none focus:border-blue-500/50 transition-all cursor-pointer uppercase tracking-widest"
               >
-                <option value="ALL uppercase">[ Todos (Público) ]</option>
+                <option value="ALL">[ Canales Abiertos ]</option>
                 {onlineUsers.map(user => (
                   <option key={user} value={user}>[ PRIVADO: {user} ]</option>
                 ))}
               </select>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <button
                 onMouseDown={startRecording}
                 onMouseUp={stopRecording}
                 onMouseLeave={stopRecording}
-                onTouchStart={startRecording}
-                onTouchEnd={stopRecording}
-                className={`p-4 rounded-xl transition-all shadow-xl flex-shrink-0 ${
+                className={`p-5 rounded-2xl transition-all shadow-2xl flex-shrink-0 border ${
                   isRecording 
-                    ? 'bg-red-500 text-white scale-95 animate-pulse shadow-red-500/20' 
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                    ? 'bg-rose-600 border-rose-500 text-white scale-95 animate-pulse shadow-rose-600/20' 
+                    : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-blue-400 hover:border-blue-500/50'
                 }`}
               >
-                <Mic className="w-5 h-5" />
+                <Mic className="w-6 h-6" />
               </button>
 
               <div className="flex-1 relative">
@@ -266,64 +295,103 @@ export default function TeamChatPage() {
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  placeholder="Escribe un mensaje de difusión..."
-                  className="w-full bg-slate-950 text-slate-100 rounded-xl px-5 py-4 text-sm outline-none border border-slate-800 focus:border-blue-500/50 transition-all placeholder:text-slate-600 shadow-inner"
+                  placeholder="Inyectar mensaje a la red..."
+                  className="w-full bg-slate-950 text-white rounded-2xl px-6 py-5 text-sm outline-none border border-slate-800 focus:border-blue-500 transition-all placeholder:text-slate-700 shadow-inner"
                 />
               </div>
 
               <button
                 onClick={sendMessage}
-                className="p-4 bg-blue-600 hover:bg-blue-50 rounded-xl text-white hover:text-blue-600 transition-all shadow-xl shadow-blue-600/10 group active:scale-95"
+                className="p-5 bg-blue-600 hover:bg-blue-500 rounded-2xl text-white transition-all shadow-2xl shadow-blue-900/40 active:scale-90"
               >
-                <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                <Send className="w-6 h-6" />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Sidebar: Online Users */}
-        <div className={`
-          fixed md:relative inset-y-0 right-0 z-40
-          w-72 bg-slate-900 md:bg-slate-900/30 border-l border-slate-800 p-4 
-          transition-transform duration-300 ease-in-out
-          ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
-          hide-scrollbar
-        `}>
-          <div className="flex items-center justify-between mb-4 md:mb-6">
-            <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-              <Users className="w-3 h-3" />
-              Unidades en Línea
-            </h2>
-            <button 
-              onClick={() => setIsSidebarOpen(false)}
-              className="md:hidden p-1 text-slate-500 hover:text-white"
+        {/* Sidebar: Online Users (OVERLAY ON MOBILE) */}
+        <AnimatePresence>
+          {isSidebarOpen && (
+            <motion.div 
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              className="fixed md:hidden inset-0 z-40 bg-slate-950/95 backdrop-blur-xl p-8 pt-24"
             >
-              <Trash2 className="w-4 h-4 rotate-45" /> {/* Close icon alternative */}
-            </button>
-          </div>
-          <div className="space-y-2">
+              <button 
+                onClick={() => setIsSidebarOpen(false)}
+                className="absolute top-8 right-8 p-3 bg-slate-800 rounded-2xl text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <h2 className="text-xs font-black text-white uppercase tracking-[0.3em] mb-10 flex items-center gap-4">
+                <Users className="w-5 h-5 text-blue-500" />
+                Unidades Activas
+              </h2>
+
+              <div className="space-y-4">
+                {onlineUsers.length === 0 ? (
+                  <div className="p-10 rounded-3xl border-2 border-dashed border-slate-800 text-center">
+                    <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">Silencio en el sector</p>
+                  </div>
+                ) : (
+                  onlineUsers.map((user) => (
+                    <div 
+                      key={user}
+                      className="flex items-center justify-between p-5 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/20">
+                          <User className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-sm font-black text-white uppercase tracking-tighter">
+                          {user}
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => { makeCall(user); setIsSidebarOpen(false); }}
+                        className="p-4 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-900/40 active:scale-90"
+                      >
+                        <PhoneCall className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Sidebar for Desktop */}
+        <div className="hidden md:block w-80 bg-slate-900/30 border-l border-slate-800 p-6 overflow-y-auto custom-scrollbar">
+          <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-8 flex items-center gap-3">
+            <Users className="w-4 h-4" />
+            Unidades en Línea
+          </h2>
+          <div className="space-y-3">
             {onlineUsers.length === 0 ? (
-              <div className="p-4 rounded-xl border border-dashed border-slate-800 text-center">
-                <p className="text-[10px] text-slate-600 font-bold uppercase">No hay otras unidades</p>
+              <div className="p-6 rounded-2xl border border-dashed border-slate-800 text-center">
+                <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest leading-loose">No hay señales de otras unidades en este cuadrante.</p>
               </div>
             ) : (
               onlineUsers.map((user) => (
                 <div 
                   key={user}
-                  className="group flex items-center justify-between p-3 rounded-xl bg-slate-800/20 border border-white/5 hover:bg-slate-800/40 hover:border-blue-500/30 transition-all"
+                  className="group flex items-center justify-between p-4 rounded-2xl bg-slate-900/50 border border-slate-800/50 hover:bg-slate-900 hover:border-blue-500/50 transition-all shadow-lg"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center border border-white/10 group-hover:from-blue-600 group-hover:to-blue-700 transition-all">
-                      <User className="w-4 h-4 text-slate-400 group-hover:text-white" />
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700 group-hover:bg-blue-600 group-hover:border-blue-500 transition-all">
+                      <User className="w-5 h-5 text-slate-500 group-hover:text-white" />
                     </div>
-                    <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors capitalize">
+                    <span className="text-xs font-black text-slate-300 group-hover:text-white transition-colors uppercase tracking-tight">
                       {user}
                     </span>
                   </div>
                   <button 
                     onClick={() => makeCall(user)}
-                    className="p-2 text-slate-500 hover:text-green-400 bg-slate-900/50 rounded-lg border border-white/5 hover:border-green-400/30 transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
-                    title="Iniciar llamada de voz"
+                    className="p-3 text-slate-500 hover:text-emerald-400 bg-slate-950 rounded-xl border border-slate-800 hover:border-emerald-500/50 transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 shadow-xl"
                   >
                     <PhoneCall className="w-4 h-4" />
                   </button>
@@ -337,49 +405,64 @@ export default function TeamChatPage() {
       {/* Audio Remoto Oculto */}
       <audio ref={audioRef} autoPlay />
 
-      {/* Call Overlay */}
-      {callStatus !== 'idle' && (
-        <div className="absolute inset-0 z-50 bg-slate-950/90 backdrop-blur-xl flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300">
-          <div className="relative">
-            <div className="w-32 h-32 rounded-full bg-blue-600/20 flex items-center justify-center animate-pulse">
-              <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center shadow-2xl shadow-blue-600/50">
-                <User className="w-12 h-12 text-white" />
+      {/* Call Overlay (Visualizer style) */}
+      <AnimatePresence>
+        {callStatus !== 'idle' && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-2xl flex flex-col items-center justify-center p-8 text-center"
+          >
+            <div className="relative mb-12">
+              <div className="absolute inset-0 bg-blue-600 blur-3xl opacity-20 animate-pulse rounded-full" />
+              <div className="w-40 h-40 rounded-full bg-slate-900 border-4 border-blue-600/30 flex items-center justify-center relative z-10 shadow-2xl">
+                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-inner">
+                  <User className="w-16 h-16 text-white" />
+                </div>
+              </div>
+              {callStatus === 'connected' && (
+                <div className="absolute -top-4 -right-4 bg-emerald-500 p-4 rounded-3xl animate-bounce shadow-2xl border-4 border-slate-950">
+                  <Volume2 className="w-6 h-6 text-white" />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <h2 className="text-3xl font-black text-white uppercase tracking-tighter">{currentPeer}</h2>
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex gap-1">
+                  {[1,2,3,4,5].map(i => (
+                    <div key={i} className={`w-1 h-4 bg-blue-500 rounded-full animate-wave-${i}`} />
+                  ))}
+                </div>
+                <p className="text-blue-400 font-black tracking-[0.5em] text-[10px] uppercase animate-pulse">
+                  {callStatus === 'calling' ? 'Estableciendo Enlace...' : 
+                   callStatus === 'incoming' ? 'Solicitud de Conexión' : 
+                   callStatus === 'connected' ? 'Comunicación Segura' : ''}
+                </p>
               </div>
             </div>
-            {callStatus === 'connected' && (
-              <div className="absolute -top-2 -right-2 bg-green-500 p-2 rounded-full animate-bounce border-4 border-slate-950">
-                <Volume2 className="w-4 h-4 text-white" />
-              </div>
-            )}
-          </div>
 
-          <div className="mt-8 text-center space-y-2">
-            <h2 className="text-2xl font-bold text-white capitalize">{currentPeer}</h2>
-            <p className="text-blue-400 font-bold tracking-[0.3em] text-xs uppercase animate-pulse">
-              {callStatus === 'calling' ? 'Llamando...' : 
-               callStatus === 'incoming' ? 'Llamada Entrante' : 
-               callStatus === 'connected' ? 'Enlace Establecido' : ''}
-            </p>
-          </div>
-
-          <div className="mt-12 flex gap-8">
-            {callStatus === 'incoming' && (
+            <div className="mt-16 flex gap-10">
+              {callStatus === 'incoming' && (
+                <button
+                  onClick={acceptCall}
+                  className="w-20 h-20 rounded-full bg-emerald-600 hover:bg-emerald-500 flex items-center justify-center text-white shadow-2xl shadow-emerald-900/40 hover:scale-110 active:scale-95 transition-all"
+                >
+                  <PhoneCall className="w-10 h-10" />
+                </button>
+              )}
               <button
-                onClick={acceptCall}
-                className="w-16 h-16 rounded-full bg-green-600 hover:bg-green-500 flex items-center justify-center text-white shadow-2xl shadow-green-600/20 hover:scale-110 active:scale-95 transition-all"
+                onClick={hangUp}
+                className="w-20 h-20 rounded-full bg-rose-600 hover:bg-rose-500 flex items-center justify-center text-white shadow-2xl shadow-rose-900/40 hover:scale-110 active:scale-95 transition-all"
               >
-                <PhoneCall className="w-8 h-8" />
+                <PhoneOff className="w-10 h-10" />
               </button>
-            )}
-            <button
-              onClick={hangUp}
-              className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-500 flex items-center justify-center text-white shadow-2xl shadow-red-600/20 hover:scale-110 active:scale-95 transition-all"
-            >
-              <PhoneOff className="w-8 h-8" />
-            </button>
-          </div>
-        </div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
