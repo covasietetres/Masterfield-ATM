@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   MessageSquare,
-  Radio
+  Radio,
+  MapPin
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -43,6 +44,7 @@ export function Sidebar() {
     { name: 'Consulta', href: '/dashboard/consulta', icon: MessageSquare },
     { name: 'Frecuencia (En Vivo)', href: '/dashboard/team', icon: Radio },
     { name: 'Base de Conocimientos', href: '/dashboard/knowledge', icon: FileText },
+    { name: 'Sitios Técnicos', href: '/dashboard/sites', icon: MapPin },
     { name: 'Configuración', href: '/dashboard/settings', icon: Settings },
   ];
 
