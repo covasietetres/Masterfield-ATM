@@ -23,11 +23,14 @@ export function useWebRTC({ channel, userEmail, onCallSignal }: WebRTCOptions) {
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
     ],
   };
 
   const processCandidateQueue = useCallback(async () => {
     if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
+      console.log("Procesando candidatos en cola:", candidateQueue.current.length);
       while (candidateQueue.current.length > 0) {
         const candidate = candidateQueue.current.shift();
         if (candidate) {
@@ -42,6 +45,7 @@ export function useWebRTC({ channel, userEmail, onCallSignal }: WebRTCOptions) {
   }, []);
 
   const createPeerConnection = useCallback((targetUser: string) => {
+    console.log("Creando PeerConnection para:", targetUser);
     const pc = new RTCPeerConnection(configuration);
     
     pc.onicecandidate = (event) => {
@@ -59,13 +63,17 @@ export function useWebRTC({ channel, userEmail, onCallSignal }: WebRTCOptions) {
     };
 
     pc.ontrack = (event) => {
+      console.log("Track remoto detectado!");
       setRemoteStream(event.streams[0]);
       setCallStatus('connected');
     };
 
     pc.oniceconnectionstatechange = () => {
+      console.log("ICE Connection State:", pc.iceConnectionState);
       if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
         hangUp();
+      } else if (pc.iceConnectionState === 'connected') {
+        setCallStatus('connected');
       }
     };
 
@@ -75,6 +83,7 @@ export function useWebRTC({ channel, userEmail, onCallSignal }: WebRTCOptions) {
 
   const startLocalStream = async () => {
     try {
+      console.log("Solicitando acceso al micrófono...");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setLocalStream(stream);
       return stream;
@@ -86,11 +95,15 @@ export function useWebRTC({ channel, userEmail, onCallSignal }: WebRTCOptions) {
 
   const makeCall = async (targetUser: string) => {
     if (!channel) return;
+    console.log("Iniciando llamada a:", targetUser);
     setCallStatus('calling');
     setCurrentPeer(targetUser);
 
     const stream = await startLocalStream();
-    if (!stream) return;
+    if (!stream) {
+      setCallStatus('idle');
+      return;
+    }
 
     const pc = createPeerConnection(targetUser);
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
@@ -111,6 +124,7 @@ export function useWebRTC({ channel, userEmail, onCallSignal }: WebRTCOptions) {
 
   const handleOffer = useCallback(async (payload: any) => {
     const { offer, senderName } = payload;
+    console.log("Oferta de llamada recibida de:", senderName);
     setCurrentPeer(senderName);
     setCallStatus('incoming');
     (window as any)._pendingOffer = offer;
@@ -121,14 +135,19 @@ export function useWebRTC({ channel, userEmail, onCallSignal }: WebRTCOptions) {
     const offer = (window as any)._pendingOffer;
     if (!offer) return;
 
+    console.log("Aceptando llamada de:", currentPeer);
     const stream = await startLocalStream();
-    if (!stream) return;
+    if (!stream) {
+      hangUp();
+      return;
+    }
 
     const pc = createPeerConnection(currentPeer);
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
     await processCandidateQueue();
+    
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
@@ -142,35 +161,36 @@ export function useWebRTC({ channel, userEmail, onCallSignal }: WebRTCOptions) {
       }
     });
 
-    setCallStatus('connected');
+    // setCallStatus('connected'); // Se establece en ontrack o iceconnected
   }, [channel, currentPeer, userEmail, createPeerConnection, processCandidateQueue]);
 
   const handleAnswer = useCallback(async (payload: any) => {
     const { answer } = payload;
+    console.log("Respuesta de llamada recibida.");
     if (peerConnectionRef.current) {
       await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
       await processCandidateQueue();
-      setCallStatus('connected');
     }
   }, [processCandidateQueue]);
 
   const handleCandidate = useCallback(async (payload: any) => {
     const { candidate } = payload;
-    if (!peerConnectionRef.current || !candidate) return;
+    if (!candidate) return;
 
-    try {
-      if (peerConnectionRef.current.remoteDescription && peerConnectionRef.current.remoteDescription.type) {
+    if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription && peerConnectionRef.current.remoteDescription.type) {
+      try {
         await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-      } else {
-        candidateQueue.current.push(candidate);
+      } catch (e) {
+        console.error('Error adding received ice candidate', e);
       }
-    } catch (e) {
-      console.error('Error adding received ice candidate', e);
+    } else {
+      candidateQueue.current.push(candidate);
     }
   }, []);
 
   const hangUp = useCallback(() => {
-    if (callStatus === 'idle') return;
+    console.log("Finalizando comunicación...");
+    const peerToNotify = currentPeer;
 
     if (peerConnectionRef.current) {
       peerConnectionRef.current.oniceconnectionstatechange = null;
@@ -182,11 +202,10 @@ export function useWebRTC({ channel, userEmail, onCallSignal }: WebRTCOptions) {
       setLocalStream(null);
     }
     
-    const peerToNotify = currentPeer;
-
     setRemoteStream(null);
     setCallStatus('idle');
     setCurrentPeer(null);
+    candidateQueue.current = [];
     
     if (channel && peerToNotify) {
        channel.send({
@@ -198,7 +217,7 @@ export function useWebRTC({ channel, userEmail, onCallSignal }: WebRTCOptions) {
          }
        }).catch(e => console.error("Error al enviar hangup:", e));
     }
-  }, [channel, currentPeer, localStream, userEmail, callStatus]);
+  }, [channel, currentPeer, localStream, userEmail]);
 
   // Switchboard Listener
   useEffect(() => {
