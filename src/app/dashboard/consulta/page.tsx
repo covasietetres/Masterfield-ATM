@@ -306,14 +306,14 @@ export default function ConsultaPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             suppressHydrationWarning
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 z-[70] flex items-center justify-center p-0 md:p-4 bg-black/90 backdrop-blur-md"
             onClick={() => { setSelectedDoc(null); setOcrMode(false); stopSpeaking(); }}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-900 border border-slate-700 w-full max-w-6xl h-[90vh] rounded-2xl overflow-hidden flex flex-col shadow-2xl"
+              className="bg-slate-900 border-none md:border md:border-slate-700 w-full max-w-6xl h-screen md:h-[90vh] md:rounded-2xl overflow-hidden flex flex-col shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
@@ -332,7 +332,7 @@ export default function ConsultaPage() {
                   <button
                     suppressHydrationWarning
                     onClick={() => { setSelectedDoc(null); setOcrMode(false); stopSpeaking(); }}
-                    className="sm:hidden p-1 -mr-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors shrink-0"
+                    className="sm:hidden p-3 -mr-2 bg-blue-600 text-white rounded-xl shadow-xl shadow-blue-900/40 active:scale-95 transition-all"
                   >
                     <X className="w-6 h-6" />
                   </button>
