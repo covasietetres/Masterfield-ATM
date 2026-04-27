@@ -55,7 +55,11 @@ export default function TeamChatPage() {
   useEffect(() => {
     if (remoteStream && audioRef.current) {
       audioRef.current.srcObject = remoteStream;
-      audioRef.current.play().catch(e => console.error("Error auto-playing remote audio:", e));
+      // En iOS Safari, a veces hay que silenciar y volver a activar para que el autoplay funcione
+      audioRef.current.play().catch(e => {
+        console.error("Error auto-playing remote audio:", e);
+        // Reintentar si falla por política de autoplato
+      });
     }
   }, [remoteStream]);
 
@@ -94,10 +98,16 @@ export default function TeamChatPage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
+      // Detectar iOS para preferir mp4
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      
       // Determine supported mime type
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus' 
-        : (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm');
+      let mimeType = 'audio/webm;codecs=opus';
+      if (isIOS) {
+        mimeType = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/mpeg';
+      } else if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      }
 
       const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
@@ -172,8 +182,11 @@ export default function TeamChatPage() {
     let ringInterval: NodeJS.Timeout | null = null;
     
     if (callStatus === 'calling' || callStatus === 'incoming') {
-      const playRing = () => {
+      const playRing = async () => {
         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
         const playTone = (freq: number, start: number, duration: number) => {
           const oscillator = audioCtx.createOscillator();
           const gainNode = audioCtx.createGain();
@@ -448,7 +461,7 @@ export default function TeamChatPage() {
       </div>
 
       {/* Audio Remoto Oculto */}
-      <audio ref={audioRef} autoPlay />
+      <audio ref={audioRef} autoPlay playsInline />
 
       {/* Call Overlay (Visualizer style) */}
       <AnimatePresence>
@@ -492,7 +505,15 @@ export default function TeamChatPage() {
             <div className="mt-16 flex gap-10">
               {callStatus === 'incoming' && (
                 <button
-                  onClick={acceptCall}
+                  onClick={async () => {
+                    // Resumir AudioContext si existe en el window para iOS
+                    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+                    if (AudioCtx) {
+                      const ctx = new AudioCtx();
+                      if (ctx.state === 'suspended') await ctx.resume();
+                    }
+                    acceptCall();
+                  }}
                   className="w-20 h-20 rounded-full bg-emerald-600 hover:bg-emerald-500 flex items-center justify-center text-white shadow-2xl shadow-emerald-900/40 hover:scale-110 active:scale-95 transition-all"
                 >
                   <PhoneCall className="w-10 h-10" />

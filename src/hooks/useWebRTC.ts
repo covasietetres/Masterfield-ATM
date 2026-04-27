@@ -175,15 +175,17 @@ export function useWebRTC({ channel, userEmail, onCallSignal }: WebRTCOptions) {
 
   const handleCandidate = useCallback(async (payload: any) => {
     const { candidate } = payload;
-    if (!candidate) return;
+    if (!candidate || !candidate.candidate) return;
 
     if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription && peerConnectionRef.current.remoteDescription.type) {
       try {
+        console.log("Añadiendo candidato ICE inmediatamente");
         await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
       } catch (e) {
         console.error('Error adding received ice candidate', e);
       }
     } else {
+      console.log("Encolando candidato ICE para después");
       candidateQueue.current.push(candidate);
     }
   }, []);
