@@ -15,11 +15,18 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ATM Field Master",
   description: "Engineer Access Portal for NCR, Diebold, and GRG ATMs",
+  manifest: "/manifest.json",
+  themeColor: "#020617",
   viewport: {
     width: 'device-width',
     initialScale: 1,
     maximumScale: 1,
     userScalable: false,
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "ATM Master",
   },
 };
 

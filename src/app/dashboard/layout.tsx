@@ -1,6 +1,7 @@
 import { Sidebar } from '@/components/Sidebar';
 import { PresenceProvider } from '@/contexts/PresenceContext';
 import { CallNotification } from '@/components/CallNotification';
+import PWAInstaller from '@/components/PWAInstaller';
 
 export default function DashboardLayout({
   children,
@@ -11,6 +12,7 @@ export default function DashboardLayout({
     <PresenceProvider>
       <div className="min-h-[100dvh] bg-slate-950 font-sans text-slate-200">
         <CallNotification />
+        <PWAInstaller />
         <Sidebar />
         <div className="md:ml-64 flex flex-col min-h-[100dvh]">
           <main className="flex-1 p-4 pt-16 md:p-8 md:pt-8 max-w-[100vw] overflow-x-hidden">
