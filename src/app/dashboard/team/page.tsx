@@ -19,6 +19,7 @@ import {
 import { usePresence, ChatMessage } from '@/contexts/PresenceContext';
 import { useWebRTC } from '@/hooks/useWebRTC';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '@/lib/supabase';
 
 export default function TeamChatPage() {
   const { onlineUsers, isConnected, channel, userEmail, incomingCall, setIncomingCall, messages, addLocalMessage, onCallSignal } = usePresence();
