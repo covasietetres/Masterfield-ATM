@@ -268,32 +268,38 @@ export default function DolaPage() {
   return (
     <div suppressHydrationWarning className="max-w-5xl mx-auto h-[calc(100dvh-5rem)] md:h-[calc(100vh-6rem)] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
+      <header className="flex items-center justify-between mb-8 p-6 rounded-[2rem] glass-card animate-fade-in-up">
+        <div className="flex items-center gap-5">
           <div className="relative">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-xl shadow-violet-900/30">
-              <Bot className="w-7 h-7 text-white" />
+            <div className="w-16 h-16 rounded-[1.5rem] bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-2xl shadow-violet-900/40 border border-white/10">
+              <Bot className="w-8 h-8 text-white animate-float" />
             </div>
-            <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-slate-900 animate-pulse" />
+            <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-4 border-slate-950 shadow-lg shadow-emerald-500/20 animate-pulse" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-white tracking-tight uppercase">DOLA</h1>
-            <p className="text-xs text-slate-400 font-medium tracking-wide">Asistente Técnico · NCR · Diebold · GRG</p>
+            <h1 className="text-3xl font-black text-white tracking-tight uppercase leading-none">DOLA <span className="text-violet-500">IA</span></h1>
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] mt-1">Terminal de Asistencia Avanzada</p>
           </div>
         </div>
 
-        {isSpeaking && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            onClick={stopSpeaking}
-            className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-500/30 transition-colors"
-          >
-            <VolumeX className="w-4 h-4" />
-            Detener Voz
-          </motion.button>
-        )}
-      </div>
+        <div className="hidden md:flex items-center gap-3">
+          <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-[9px] font-black text-slate-500 uppercase tracking-widest">
+            Gemini 2.0 Flash
+          </div>
+          {isSpeaking && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onClick={stopSpeaking}
+              className="flex items-center gap-2 px-5 py-3 bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 transition-all shadow-xl shadow-rose-900/40 active:scale-95"
+            >
+              <VolumeX className="w-4 h-4" />
+              Detener Voz
+            </motion.button>
+          )}
+        </div>
+      </header>
+
 
       {/* Chat Area */}
       <div className="flex-1 bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden flex flex-col shadow-2xl">
@@ -354,76 +360,56 @@ export default function DolaPage() {
 
                   {/* Text bubble */}
                   {msg.text && msg.text !== '(archivo adjunto)' && (
-                    <div className={`p-4 rounded-2xl shadow-lg ${
+                    <div className={`p-5 rounded-[1.8rem] shadow-2xl transition-all ${
                       msg.role === 'user'
-                        ? 'bg-violet-600 text-white rounded-tr-sm'
-                        : 'bg-slate-800 border border-slate-700/50 text-slate-200 rounded-tl-sm'
+                         ? 'bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-tr-sm glow-blue'
+                         : 'bg-slate-900 border border-white/5 text-slate-200 rounded-tl-sm backdrop-blur-xl'
                     }`}>
                       {msg.role === 'dola' && (
-                        <div className="flex items-center justify-between mb-2 gap-4">
+                        <div className="flex items-center justify-between mb-3 gap-4">
                           <div className="flex items-center gap-2">
                             {msg.usedManuals
-                              ? <span className="flex items-center gap-1 text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full uppercase tracking-widest">
-                                  <Database className="w-2.5 h-2.5" />Manual
-                                </span>
-                              : <span className="flex items-center gap-1 text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full uppercase tracking-widest">
-                                  <Zap className="w-2.5 h-2.5" />General
-                                </span>
+                               ? <span className="flex items-center gap-1.5 text-[8px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full uppercase tracking-widest shadow-inner">
+                                   <Database className="w-2.5 h-2.5" />Manual Verificado
+                                 </span>
+                               : <span className="flex items-center gap-1.5 text-[8px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full uppercase tracking-widest shadow-inner">
+                                   <Zap className="w-2.5 h-2.5" />Conocimiento IA
+                                 </span>
                             }
                           </div>
                           <button
                             suppressHydrationWarning
                             onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.text)}
-                            className="p-1 rounded-lg hover:bg-slate-700 text-slate-500 hover:text-slate-300 transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-500 hover:text-white transition-all active:scale-90"
                             title="Escuchar respuesta"
                           >
-                            <Volume2 className="w-3.5 h-3.5" />
+                            <Volume2 className="w-4 h-4" />
                           </button>
                         </div>
                       )}
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap font-medium">{msg.text}</p>
                       
                       {/* Sources / Documents found */}
                       {msg.role === 'dola' && msg.sources && msg.sources.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-slate-700/50 space-y-3">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                            <Database className="w-3 h-3" /> Documentos Encontrados
+                        <div className="mt-6 pt-6 border-t border-white/5 space-y-4">
+                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
+                            <Database className="w-3 h-3 text-violet-500" /> Referencias Técnicas
                           </p>
-                          <div className="grid grid-cols-1 gap-2">
+                          <div className="grid grid-cols-1 gap-3">
                             {msg.sources.map((doc) => (
-                              <div key={doc.id} className="flex items-center justify-between p-2 bg-slate-900/50 border border-slate-700/30 rounded-xl hover:border-violet-500/30 transition-all group">
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                  <div className="p-1.5 rounded-lg bg-violet-600/10 text-violet-400">
-                                    <Database className="w-3.5 h-3.5" />
+                              <div key={doc.id} className="flex items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl hover:border-violet-500/30 transition-all group cursor-pointer" onClick={() => setSelectedDoc(doc)}>
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                  <div className="p-2 rounded-xl bg-violet-600/10 text-violet-400 group-hover:bg-violet-600 group-hover:text-white transition-all">
+                                    <Database className="w-4 h-4" />
                                   </div>
-                                  <span className="text-xs text-slate-300 truncate max-w-[140px] uppercase font-bold tracking-tight">
-                                    {doc.title}
-                                  </span>
+                                  <div className="overflow-hidden">
+                                    <span className="text-xs text-white truncate block uppercase font-black tracking-tight leading-none mb-1">
+                                      {doc.title}
+                                    </span>
+                                    <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest">{doc.brand} · {doc.file_type}</span>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => setSelectedDoc(doc)}
-                                    className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-violet-600 transition-all"
-                                    title="Ver Documento"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (doc.content_text) {
-                                        isSpeakingOCR ? stopSpeaking() : speakOCR(doc.content_text);
-                                      } else {
-                                        alert("Este documento aún no ha sido procesado para lectura inteligente.");
-                                      }
-                                    }}
-                                    className={`p-1.5 rounded-lg transition-all ${
-                                      isSpeakingOCR ? 'bg-red-500/20 text-red-400' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-emerald-600'
-                                    }`}
-                                    title="Lectura Inteligente"
-                                  >
-                                    <Volume2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
+                                <ArrowRight className="w-4 h-4 text-slate-700 group-hover:text-white group-hover:translate-x-1 transition-all" />
                               </div>
                             ))}
                           </div>
@@ -440,11 +426,15 @@ export default function DolaPage() {
           {isLoading && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shrink-0">
-                <Bot className="w-4 h-4 text-white" />
+                <Bot className="w-4 h-4 text-white animate-spin" />
               </div>
-              <div className="bg-slate-800 border border-slate-700/50 p-4 rounded-2xl rounded-tl-sm flex items-center gap-3">
-                <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
-                <span className="text-xs text-slate-400 italic">Consultando manuales y analizando...</span>
+              <div className="bg-slate-900 border border-white/5 p-5 rounded-[1.8rem] rounded-tl-sm flex items-center gap-3 shadow-xl backdrop-blur-xl">
+                <div className="flex gap-1">
+                  <span className="w-1.5 h-1.5 bg-violet-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="w-1.5 h-1.5 bg-violet-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                  <span className="w-1.5 h-1.5 bg-violet-500 rounded-full animate-bounce"></span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Analizando manuales y visuales...</span>
               </div>
             </motion.div>
           )}
@@ -453,62 +443,63 @@ export default function DolaPage() {
         </div>
 
         {/* Input Area */}
-        <div className="border-t border-slate-800 p-4 bg-slate-950/60">
+        <div className="border-t border-white/5 p-6 bg-slate-950/80 backdrop-blur-3xl rounded-b-[2rem]">
           {/* Attachment Preview */}
           {attachedPreview && (
-            <div className="mb-3 flex items-start gap-2">
-              <div className="relative">
-                <img src={attachedPreview} alt="preview" className="h-16 w-16 object-cover rounded-lg border border-slate-700" />
+            <div className="mb-4 flex items-start gap-3">
+              <div className="relative group">
+                <img src={attachedPreview} alt="preview" className="h-20 w-20 object-cover rounded-2xl border-2 border-violet-500/50 shadow-2xl shadow-violet-500/20" />
                 <button
                   onClick={clearAttachment}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-600 rounded-full flex items-center justify-center hover:bg-red-500 transition-colors"
+                  className="absolute -top-2 -right-2 w-7 h-7 bg-rose-600 text-white rounded-full flex items-center justify-center hover:bg-rose-500 transition-all shadow-lg active:scale-90"
                 >
-                  <X className="w-3 h-3 text-white" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="text-[10px] text-slate-500 pt-1">
-                <p className="text-slate-400 font-medium truncate max-w-xs">{attachedFile?.name}</p>
-                <p>{((attachedFile?.size || 0) / 1024).toFixed(0)} KB</p>
+              <div className="pt-2">
+                <p className="text-[10px] text-white font-black uppercase tracking-widest mb-1 truncate max-w-[150px]">{attachedFile?.name}</p>
+                <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{((attachedFile?.size || 0) / 1024).toFixed(0)} KB · Imagen Técnica</p>
               </div>
             </div>
           )}
 
-          <div className="flex items-end gap-2 md:gap-3">
+          <div className="flex items-end gap-3 md:gap-4">
             {/* Mic Button */}
             <button
               suppressHydrationWarning
               onClick={toggleMic}
-              className={`p-3 rounded-xl transition-all flex-shrink-0 ${
+              className={`p-4 rounded-2xl transition-all flex-shrink-0 shadow-2xl border-2 ${
                 isListening
-                  ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700'
+                  ? 'bg-rose-600 text-white border-rose-400 animate-pulse glow-blue shadow-rose-900/40'
+                  : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-white border-white/5'
               }`}
               title={isListening ? 'Detener micrófono' : 'Activar micrófono'}
             >
-              {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              {isListening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
             </button>
 
             {/* Text Input */}
-            <div className="flex-1 relative">
+            <div className="flex-1 relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-[1.5rem] opacity-0 group-focus-within:opacity-20 transition-opacity blur" />
               <textarea
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={isLoading}
-                placeholder={isListening ? '🎙️ Escuchando...' : 'Escribe tu consulta técnica o usa el micrófono...'}
+                placeholder={isListening ? '🎙️ Escuchando frecuencia...' : 'Escribe tu consulta técnica o usa el micrófono...'}
                 rows={1}
-                className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm py-3 px-4 pr-12 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-all placeholder:text-slate-600 resize-none leading-relaxed"
-                style={{ minHeight: '48px', maxHeight: '120px' }}
+                className="w-full bg-slate-900 border border-white/5 text-white text-sm py-4 px-6 rounded-[1.5rem] focus:outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500/40 transition-all placeholder:text-slate-600 resize-none leading-relaxed shadow-inner"
+                style={{ minHeight: '56px', maxHeight: '150px' }}
               />
             </div>
 
             {/* Attach Button */}
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="p-3 bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl transition-all flex-shrink-0"
+              className="p-4 bg-slate-900 border-2 border-white/5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-2xl transition-all flex-shrink-0 shadow-xl"
               title="Adjuntar imagen o video"
             >
-              <ImagePlus className="w-5 h-5" />
+              <ImagePlus className="w-6 h-6" />
             </button>
             <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileAttach} />
 
@@ -516,21 +507,31 @@ export default function DolaPage() {
             <button
               onClick={sendMessage}
               disabled={(!input.trim() && !attachedFile) || isLoading}
-              className="p-3 bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-xl hover:from-violet-500 hover:to-indigo-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-600 transition-all flex-shrink-0 shadow-lg shadow-violet-900/20"
+              className="p-4 bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-2xl hover:from-violet-500 hover:to-indigo-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-600 transition-all flex-shrink-0 shadow-2xl shadow-violet-900/40 active:scale-90"
               title="Enviar"
             >
-              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+              {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Send className="w-6 h-6" />}
             </button>
           </div>
 
           {/* Status bar */}
-          <div suppressHydrationWarning className="flex items-center justify-between mt-2 px-1">
-            <p suppressHydrationWarning className="text-[9px] text-slate-600 uppercase tracking-widest font-bold">
-              {isListening ? '🔴 Micrófono activo — habla ahora' : 'Enter para enviar · Shift+Enter nueva línea'}
-            </p>
-            <p className="text-[9px] text-slate-600 uppercase tracking-widest font-bold">GEMINI 1.5 FLASH</p>
+          <div suppressHydrationWarning className="flex items-center justify-between mt-4 px-2">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1.5 text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_5px_rgba(16,185,129,0.5)]"></span> Conectado
+              </span>
+              <p suppressHydrationWarning className="text-[8px] text-slate-600 uppercase tracking-widest font-black">
+                {isListening ? '🔴 Transmitiendo' : 'Shift + Enter para línea'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+               <span className="text-[8px] text-slate-600 font-black uppercase tracking-widest">Motor:</span>
+               <span className="text-[8px] text-violet-500 font-black uppercase tracking-widest bg-violet-500/5 px-2 py-0.5 rounded border border-violet-500/10">GEMINI 2.0 FLASH</span>
+            </div>
           </div>
         </div>
+      </div>
+
       </div>
 
       {/* === DOCUMENT VIEWER MODAL === */}

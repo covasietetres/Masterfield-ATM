@@ -40,12 +40,14 @@ export function Sidebar() {
   };
 
   const navItems = [
-    { name: 'Consulta AI', href: '/dashboard/consulta', icon: MessageSquare },
+    { name: 'Inicio', href: '/dashboard', icon: Home },
+    { name: 'DOLA Assistant', href: '/dashboard/chat', icon: MessageSquare },
     { name: 'Sites / Lugares', href: '/dashboard/sites', icon: MapPin },
     { name: 'Vivo (Frecuencia)', href: '/dashboard/team', icon: Radio },
     { name: 'Biblioteca', href: '/dashboard/knowledge', icon: FileText },
     { name: 'Configuración', href: '/dashboard/settings', icon: Settings },
   ];
+
 
   return (
     <>

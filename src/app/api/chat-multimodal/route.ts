@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // ── Clientes ─────────────────────────────────────────────────────────────────
 // ── Configuración ─────────────────────────────────────────────────────────────
-const MODELO_CHAT      = 'gemini-2.5-flash-lite';
+const MODELO_CHAT      = 'gemini-1.5-flash';
 const MODELO_EMBEDDING = 'text-embedding-004';
 
 function getSupabase() {
@@ -56,7 +56,6 @@ export async function POST(request: Request) {
             .map((k: string) => `content.ilike.%${k}%`)
             .join(',');
 
-          // Seleccionar contenido y metadatos del documento
           const { data: chunks } = await supabase
             .from('knowledge_chunks')
             .select('content, document_id, knowledge_documents(*)')
@@ -69,15 +68,10 @@ export async function POST(request: Request) {
               .join('\n---\n');
             usedManuals = true;
 
-            // Extraer documentos únicos encontrados
             const uniqueDocs = new Map();
             chunks.forEach((c: any) => {
               if (c.knowledge_documents && !uniqueDocs.has(c.document_id)) {
-                uniqueDocs.set(c.document_id, {
-                  ...c.knowledge_documents,
-                  // Asegurar que content_text esté disponible para lectura inteligente si es necesario
-                  // Aunque usualmente se saca de la tabla knowledge_documents
-                });
+                uniqueDocs.set(c.document_id, c.knowledge_documents);
               }
             });
             body.sources = Array.from(uniqueDocs.values());
@@ -89,24 +83,25 @@ export async function POST(request: Request) {
     }
 
     // ── 2. Construir prompt del sistema ──────────────────────────────────────
-    const systemText = `ERES DOLA, EXPERTA TÉCNICA EN CAJEROS AUTOMÁTICOS (NCR, DIEBOLD, GRG).
+    const systemText = `ERES DOLA, LA ASISTENTE TÉCNICA DE ÉLITE PARA INGENIEROS DE CAMPO DE CAJEROS AUTOMÁTICOS (NCR, DIEBOLD, GRG).
 
-PERSONALIDAD: Cordial, directa y extremadamente precisa. Combinas la calidez de una asistente virtual con el conocimiento técnico de un ingeniero senior.
+TU MISIÓN: Resolver problemas técnicos en el menor tiempo posible, evitando que el ingeniero pierda tiempo leyendo manuales extensos.
+
+PERSONALIDAD: Profesional, técnica, concisa y sumamente eficiente. Hablas como un ingeniero senior asesorando a un colega en el sitio.
 
 ${usedManuals
-  ? `BASE DE CONOCIMIENTO DISPONIBLE (ÚSALA COMO PRIMERA FUENTE):\n${contextText}`
-  : `NOTA: No se encontraron manuales relevantes. Usa tu base de conocimiento interna sobre ATMs.`
+  ? `INFORMACIÓN TÉCNICA EXTRAÍDA (ÚSALA COMO PRIORIDAD ABSOLUTA):\n${contextText}`
+  : `NOTA: No hay manuales específicos para esta consulta. Responde basándote en tu conocimiento experto de hardware ATM.`
 }
 
-REGLAS ABSOLUTAS:
-1. SIEMPRE prioriza la información de los manuales sobre conocimiento general.
-2. Si hay imagen: analiza PRIMERO el problema visual, luego apóyate en los manuales.
-3. Da pasos numerados, claros y concisos.
-4. Si no sabes algo, dilo directamente: "No tengo información sobre eso en los manuales."
-5. IDIOMA: Español únicamente. Jamás respondas en inglés.
-6. Responde en texto corrido, sin markdown excesivo, optimizado para ser leído en voz alta.`;
+REGLAS DE RESPUESTA:
+1. SÉ CONCISO: No saludes excesivamente. Ve directo a la falla y la solución.
+2. PASOS ACCIONABLES: Presenta la solución en una lista numerada de pasos físicos (ej. "1. Abre la puerta del dispensador...", "2. Verifica el sensor S1...").
+3. REFERENCIA: Si usas manuales, menciona brevemente la fuente (ej. "Según el manual del NCR 6622...").
+4. ANÁLISIS VISUAL: Si hay una imagen, identifícala primero: "Veo un error de atasco en el transporte de billetes..." y luego da la solución.
+5. CERO CARACTERES ESPECIALES: Evita markdown complejo (*, #, _) para que el lector de voz (TTS) no se confunda. Usa texto plano limpio.
+6. IDIOMA: Español técnico de Latinoamérica/España.`;
 
-    // ── 3. Armar partes del contenido ────────────────────────────────────────
     const parts: any[] = [
       { text: systemText },
       { text: `CONSULTA DEL INGENIERO: ${message || 'Analiza el archivo adjunto y describe el problema.'}` },
@@ -118,13 +113,11 @@ REGLAS ABSOLUTAS:
       });
     }
 
-    // ── 4. Llamar a Gemini ───────────────────────────────────────────────────
     const aiModel = genAI.getGenerativeModel({ model: MODELO_CHAT });
     const result = await aiModel.generateContent(parts);
 
     const aiResponse = result.response.text() || 'No pude generar una respuesta. Por favor, intenta de nuevo.';
 
-    // ── 5. Guardar en historial ──────────────────────────────────────────────
     try {
       await supabase.from('query_history').insert({
         engineer_id: engineerId || null,
