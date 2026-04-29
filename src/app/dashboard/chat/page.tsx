@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Mic, MicOff, Paperclip, X, Volume2, VolumeX, Zap, Database, ImagePlus, Loader2, Bot, Eye, AlignLeft, BookOpen } from 'lucide-react';
+import { Send, Mic, MicOff, Paperclip, X, Volume2, VolumeX, Zap, Database, ImagePlus, Loader2, Bot, Eye, AlignLeft, BookOpen, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 
@@ -532,9 +532,8 @@ export default function DolaPage() {
         </div>
       </div>
 
-      </div>
-
       {/* === DOCUMENT VIEWER MODAL === */}
+
       <AnimatePresence>
         {mounted && selectedDoc && (
           <motion.div
