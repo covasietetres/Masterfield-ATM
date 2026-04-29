@@ -73,7 +73,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
       activeChannel.on('broadcast', { event: 'bipper' }, (payload) => {
         const p = payload.payload;
         if (p.targetUser === 'ALL' || p.targetUser === shortName) {
-           playNotificationSound();
+           playNotificationSound(p.senderName);
         }
       });
 
@@ -121,7 +121,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
         // Play sound if message is not from self
         if (p.senderName !== shortName) {
-          playNotificationSound();
+          playNotificationSound(p.senderName);
         }
 
         const newMessage: ChatMessage = {
@@ -157,8 +157,16 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
       });
     };
 
-    const playNotificationSound = () => {
+    const playNotificationSound = (senderName?: string) => {
        try {
+         // Show system notification if in background
+         if (document.visibilityState === 'hidden' && Notification.permission === 'granted') {
+           new Notification('🚨 ALERTA CRÍTICA', {
+             body: `${senderName || 'Un ingeniero'} te está enviando un BIP de alerta.`,
+             icon: '/icon.png'
+           });
+         }
+
          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
          const playTone = (freq: number, start: number, duration: number) => {
            const oscillator = audioCtx.createOscillator();
