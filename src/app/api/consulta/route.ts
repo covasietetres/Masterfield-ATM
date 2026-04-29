@@ -52,7 +52,18 @@ export async function POST(request: Request) {
       .or(titleFilters)
       .limit(10);
 
-    if (chunksError || docsError) throw (chunksError || docsError);
+    // 3. Buscar en Sitios Técnicos (Lugares)
+    const siteFilters = keywords
+      .map((k: string) => `name.ilike.%${k}%`)
+      .join(',');
+
+    const { data: sites, error: sitesError } = await supabase
+      .from('technical_sites')
+      .select('*')
+      .or(siteFilters)
+      .limit(5);
+
+    if (chunksError || docsError || sitesError) throw (chunksError || docsError || sitesError);
 
     const uniqueDocs = new Map();
 
@@ -67,6 +78,22 @@ export async function POST(request: Request) {
     docsByTitle?.forEach((doc: any) => {
       if (!uniqueDocs.has(doc.id)) {
         uniqueDocs.set(doc.id, doc);
+      }
+    });
+
+    // Agregar sitios técnicos mapeados como documentos
+    sites?.forEach((site: any) => {
+      const siteId = `site-${site.id}`;
+      if (!uniqueDocs.has(siteId)) {
+        uniqueDocs.set(siteId, {
+          id: siteId,
+          title: site.name,
+          brand: 'UBICACIÓN',
+          file_type: 'location',
+          content_text: `UBICACIÓN: ${site.location}\n\nCOMO LLEGAR: ${site.how_to_get || 'Sin instrucciones adicionales'}`,
+          storage_path: site.location, // Usamos esto para el link de mapas si es necesario
+          created_at: site.created_at
+        });
       }
     });
 

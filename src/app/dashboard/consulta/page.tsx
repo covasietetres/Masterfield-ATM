@@ -25,7 +25,7 @@ import { supabase } from '@/lib/supabase';
 interface KnowledgeDocument {
   id: string;
   title: string;
-  file_type: 'pdf' | 'image' | 'video';
+  file_type: 'pdf' | 'image' | 'video' | 'location';
   brand: string;
   storage_path: string;
   uploaded_by: string;
@@ -108,6 +108,9 @@ export default function ConsultaPage() {
   };
 
   const getPublicUrl = (doc: KnowledgeDocument) => {
+    if (doc.file_type === 'location') {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(doc.storage_path)}`;
+    }
     const bucket = doc.file_type === 'pdf' ? 'manuals' : 'media';
     const { data } = supabase.storage.from(bucket).getPublicUrl(doc.storage_path);
     return data.publicUrl;
@@ -226,10 +229,18 @@ export default function ConsultaPage() {
                   <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
                   
                   <div className="flex items-start justify-between relative z-10">
-                    <div className="p-4 bg-blue-500/10 rounded-2xl text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 group-hover:scale-110 shadow-lg">
-                      <Database className="w-6 h-6" />
+                    <div className={`p-4 rounded-2xl transition-all duration-500 group-hover:scale-110 shadow-lg ${
+                      doc.file_type === 'location' 
+                        ? 'bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' 
+                        : 'bg-blue-500/10 text-blue-400 group-hover:bg-blue-600 group-hover:text-white'
+                    }`}>
+                      {doc.file_type === 'location' ? <Search className="w-6 h-6" /> : <Database className="w-6 h-6" />}
                     </div>
-                    <span className="text-[9px] bg-slate-800 px-3 py-1.5 rounded-xl text-slate-400 uppercase font-black tracking-widest border border-slate-700 shadow-inner">
+                    <span className={`text-[9px] px-3 py-1.5 rounded-xl uppercase font-black tracking-widest border shadow-inner ${
+                      doc.file_type === 'location' 
+                        ? 'bg-emerald-950/50 text-emerald-400 border-emerald-500/30' 
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
                       {doc.file_type}
                     </span>
                   </div>
@@ -239,17 +250,20 @@ export default function ConsultaPage() {
                       {doc.title}
                     </h3>
                     <div className="flex items-center gap-3 mt-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                      <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">{doc.brand}</p>
+                      <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${doc.file_type === 'location' ? 'bg-emerald-500' : 'bg-blue-500'}`} />
+                      <p className={`text-[10px] uppercase font-black tracking-widest ${doc.file_type === 'location' ? 'text-emerald-500' : 'text-slate-500'}`}>{doc.brand}</p>
                     </div>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-slate-800/50 relative z-10">
-                    <button
-                      onClick={() => setSelectedDoc(doc)}
-                      className="flex-1 flex items-center justify-center gap-3 py-4 bg-slate-950 hover:bg-blue-600 text-slate-400 hover:text-white rounded-2xl transition-all font-black text-[10px] uppercase tracking-widest shadow-xl border border-slate-800 active:scale-95"
+                      className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl transition-all font-black text-[10px] uppercase tracking-widest shadow-xl border active:scale-95 ${
+                        doc.file_type === 'location'
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400'
+                          : 'bg-slate-950 hover:bg-blue-600 text-slate-400 hover:text-white border-slate-800'
+                      }`}
                     >
-                      <Eye className="w-4 h-4" /> Visualizar
+                      {doc.file_type === 'location' ? <Search className="w-4 h-4" /> : <Eye className="w-4 h-4" />} 
+                      {doc.file_type === 'location' ? 'Ver Ubicación' : 'Visualizar'}
                     </button>
                     <button
                       onClick={() => {
@@ -374,7 +388,26 @@ export default function ConsultaPage() {
               {/* Modal Body */}
               <div className="flex-1 flex overflow-hidden">
                 <div className={`transition-all duration-300 bg-slate-950 relative overflow-hidden ${ocrMode ? 'w-1/2' : 'w-full'}`}>
-                  {selectedDoc.file_type === 'pdf' ? (
+                  {selectedDoc.file_type === 'location' ? (
+                    <div suppressHydrationWarning className="w-full h-full flex flex-col items-center justify-center p-8 gap-8 bg-slate-950">
+                      <div className="p-8 bg-emerald-500/10 rounded-[3rem] border border-emerald-500/20 shadow-2xl shadow-emerald-500/5">
+                        <Search className="w-16 h-16 text-emerald-500" />
+                      </div>
+                      <div className="text-center space-y-4 max-w-md">
+                        <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Punto de Enlace Detectado</h2>
+                        <p className="text-slate-400 text-sm leading-relaxed">{selectedDoc.content_text?.split('\n\n')[0]}</p>
+                      </div>
+                      <a 
+                        href={getPublicUrl(selectedDoc)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-2xl shadow-emerald-900/40 active:scale-95 flex items-center gap-3"
+                      >
+                        <Search className="w-5 h-5" />
+                        Abrir en Google Maps
+                      </a>
+                    </div>
+                  ) : selectedDoc.file_type === 'pdf' ? (
                     <iframe
                       suppressHydrationWarning
                       src={`https://docs.google.com/viewer?url=${encodeURIComponent(getPublicUrl(selectedDoc))}&embedded=true`}
