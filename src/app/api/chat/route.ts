@@ -29,15 +29,17 @@ export async function POST(request: Request) {
     // 3. Extraer el conocimiento real de Supabase
     const { data: issues, error: issuesError } = await supabase.from('issues').select('title, symptom, fix');
     const { data: codes, error: codesError } = await supabase.from('codes').select('code, description');
+    const { data: sites, error: sitesError } = await supabase.from('technical_sites').select('name, location, how_to_get');
 
-    if (issuesError || codesError) {
-      console.error("ERROR LEYENDO SUPABASE:", issuesError || codesError);
+    if (issuesError || codesError || sitesError) {
+      console.error("ERROR LEYENDO SUPABASE:", issuesError || codesError || sitesError);
       return NextResponse.json({ reply: "Error conectando con la base de conocimientos." }, { status: 500 });
     }
 
     const contextText = `
       FALLAS DOCUMENTADAS: ${JSON.stringify(issues || [])}
       CÓDIGOS DE ERROR: ${JSON.stringify(codes || [])}
+      SITIOS TÉCNICOS (UBICACIONES): ${JSON.stringify(sites || [])}
     `;
 
     // 4. Personalidades
