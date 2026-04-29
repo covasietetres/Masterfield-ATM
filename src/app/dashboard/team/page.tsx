@@ -385,6 +385,24 @@ export default function TeamChatPage() {
               >
                 <Send className="w-6 h-6" />
               </button>
+
+              <button
+                onClick={async () => {
+                  if (!channel) return;
+                  await channel.send({
+                    type: 'broadcast',
+                    event: 'bipper',
+                    payload: { targetUser, senderName: userEmail }
+                  });
+                  // Local feedback
+                  if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
+                  alert('¡Alerta de Bipper enviada a ' + targetUser + '!');
+                }}
+                className="p-4 md:p-5 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl transition-all shadow-2xl shadow-rose-900/40 active:scale-90 flex-shrink-0 border-2 border-rose-400/50"
+                title="Enviar Alerta Crítica (Bipper)"
+              >
+                <Zap className="w-6 h-6 fill-current" />
+              </button>
             </div>
             
             {/* Mobile PTT Label */}

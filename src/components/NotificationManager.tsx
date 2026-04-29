@@ -54,6 +54,40 @@ export default function NotificationManager() {
     };
   }, []);
 
+  const subscribeToPush = async () => {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      
+      // Check for existing subscription
+      let subscription = await registration.pushManager.getSubscription();
+      
+      if (!subscription) {
+        // We use a public VAPID key (Placeholder, user should replace with their own)
+        // For testing, I'll use a standard one or suggest generating one.
+        const vapidPublicKey = 'BEl62iC7969_9mO9uF-X1pMTt-A3xM1kLAn3z.X.X.X'; // Placeholder
+        
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: vapidPublicKey
+        });
+      }
+
+      // Save to Supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('push_subscriptions')
+          .upsert({
+            user_id: user.id,
+            subscription: subscription.toJSON()
+          });
+        console.log('Push subscription saved to Supabase');
+      }
+    } catch (err) {
+      console.error('Error subscribing to push:', err);
+    }
+  };
+
   const requestPermission = async () => {
     if (!isSupported) return;
     
@@ -61,9 +95,8 @@ export default function NotificationManager() {
     setPermission(result);
 
     if (result === 'granted') {
-      // Logic to subscribe to push notifications would go here
-      // For now, we confirm registration
-      console.log('Notification permission granted.');
+      await subscribeToPush();
+      console.log('Notification permission granted and subscribed.');
     }
   };
 
