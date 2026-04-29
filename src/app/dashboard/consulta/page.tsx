@@ -256,6 +256,8 @@ export default function ConsultaPage() {
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-slate-800/50 relative z-10">
+                    <button
+                      onClick={() => setSelectedDoc(doc)}
                       className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-2xl transition-all font-black text-[10px] uppercase tracking-widest shadow-xl border active:scale-95 ${
                         doc.file_type === 'location'
                           ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400'
