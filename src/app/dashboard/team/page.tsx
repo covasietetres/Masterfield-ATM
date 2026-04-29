@@ -41,10 +41,12 @@ export default function TeamChatPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const [allEngineers, setAllEngineers] = useState<{name: string, isOnline: boolean}[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     const fetchEngineers = async () => {
+      setIsLoading(true);
       const { data, error } = await supabase
         .from('engineers')
         .select('name')
@@ -57,6 +59,7 @@ export default function TeamChatPage() {
         }));
         setAllEngineers(engineersList);
       }
+      setIsLoading(false);
     };
 
     fetchEngineers();
@@ -413,9 +416,14 @@ export default function TeamChatPage() {
               </h2>
 
               <div className="space-y-4">
-                {allEngineers.length === 0 ? (
+                {isLoading ? (
                   <div className="p-10 rounded-3xl border-2 border-dashed border-slate-800 text-center">
-                    <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">Sincronizando personal...</p>
+                    <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest animate-pulse">Sincronizando personal...</p>
+                  </div>
+                ) : allEngineers.length === 0 ? (
+                  <div className="p-10 rounded-3xl border-2 border-dashed border-slate-800 text-center">
+                    <p className="text-[10px] text-rose-500 font-black uppercase tracking-widest">No hay personal registrado</p>
+                    <p className="text-[8px] text-slate-600 mt-2">Asegúrate de que los ingenieros estén en la base de datos.</p>
                   </div>
                 ) : (
                   allEngineers.map((eng) => (
@@ -457,9 +465,13 @@ export default function TeamChatPage() {
             Personal Registrado
           </h2>
           <div className="space-y-3">
-            {allEngineers.length === 0 ? (
+            {isLoading ? (
               <div className="p-6 rounded-2xl border border-dashed border-slate-800 text-center">
-                <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest leading-loose">Sincronizando personal...</p>
+                <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest animate-pulse">Sincronizando...</p>
+              </div>
+            ) : allEngineers.length === 0 ? (
+              <div className="p-6 rounded-2xl border border-dashed border-slate-800 text-center">
+                <p className="text-[9px] text-rose-500 font-black uppercase tracking-widest leading-loose">No hay personal registrado en el sistema.</p>
               </div>
             ) : (
               allEngineers.map((eng) => (
