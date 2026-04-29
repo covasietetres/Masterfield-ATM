@@ -4,18 +4,18 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // ── Clientes ─────────────────────────────────────────────────────────────────
 // ── Configuración ─────────────────────────────────────────────────────────────
-const MODELO_CHAT      = 'gemini-2.0-flash';
-const MODELO_EMBEDDING = 'gemini-embedding-2'; // Actualizado según disponibilidad en el entorno
+const MODELO_CHAT      = 'gemini-2.5-flash-lite';
+const MODELO_EMBEDDING = 'text-embedding-004';
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   if (!url || !key) return null;
   return createClient(url, key);
 }
 
 function getGenAI() {
-  const key = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY!;
+  const key = process.env.GEMINI_API_KEY!;
   if (!key) return null;
   return new GoogleGenerativeAI(key);
 }
@@ -26,9 +26,7 @@ export async function POST(request: Request) {
   const genAI = getGenAI();
 
   if (!supabase || !genAI) {
-    return NextResponse.json({ 
-      error: 'Configuración de servidor incompleta. Verifica las variables de entorno en Vercel.' 
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Configuración de servidor incompleta (Variables de entorno).' }, { status: 500 });
   }
 
   try {
@@ -42,7 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // ── 1. Buscar contexto en la base de conocimiento ─────
+    // ── 1. Buscar contexto en la base de conocimiento (sin costo de API) ─────
     let contextText = '';
     let usedManuals = false;
 
@@ -58,13 +56,12 @@ export async function POST(request: Request) {
             .map((k: string) => `content.ilike.%${k}%`)
             .join(',');
 
-          const { data: chunks, error: dbError } = await supabase
+          // Seleccionar contenido y metadatos del documento
+          const { data: chunks } = await supabase
             .from('knowledge_chunks')
             .select('content, document_id, knowledge_documents(*)')
             .or(orFilters)
             .limit(8);
-
-          if (dbError) throw dbError;
 
           if (chunks && chunks.length > 0) {
             contextText = chunks
@@ -72,40 +69,44 @@ export async function POST(request: Request) {
               .join('\n---\n');
             usedManuals = true;
 
+            // Extraer documentos únicos encontrados
             const uniqueDocs = new Map();
             chunks.forEach((c: any) => {
               if (c.knowledge_documents && !uniqueDocs.has(c.document_id)) {
-                uniqueDocs.set(c.document_id, c.knowledge_documents);
+                uniqueDocs.set(c.document_id, {
+                  ...c.knowledge_documents,
+                  // Asegurar que content_text esté disponible para lectura inteligente si es necesario
+                  // Aunque usualmente se saca de la tabla knowledge_documents
+                });
               }
             });
             body.sources = Array.from(uniqueDocs.values());
           }
         }
       } catch (searchErr: any) {
-        console.warn('[DOLA] Búsqueda de contexto fallida:', searchErr.message);
+      console.warn('[AI] Búsqueda de contexto fallida:', searchErr.message);
       }
     }
 
     // ── 2. Construir prompt del sistema ──────────────────────────────────────
-    const systemText = `ERES DOLA, LA ASISTENTE TÉCNICA DE ÉLITE PARA INGENIEROS DE CAMPO DE CAJEROS AUTOMÁTICOS (NCR, DIEBOLD, GRG).
+    const systemText = `ERES EL ASISTENTE TÉCNICO VIRTUAL EXPERTO EN CAJEROS AUTOMÁTICOS (NCR, DIEBOLD, GRG).
 
-TU MISIÓN: Resolver problemas técnicos en el menor tiempo posible, evitando que el ingeniero pierda tiempo leyendo manuales extensos.
-
-PERSONALIDAD: Profesional, técnica, concisa y sumamente eficiente. Hablas como un ingeniero senior asesorando a un colega en el sitio.
+PERSONALIDAD: Cordial, directa y extremadamente precisa. Combinas la calidez de una asistente virtual con el conocimiento técnico de un ingeniero senior.
 
 ${usedManuals
-  ? `INFORMACIÓN TÉCNICA EXTRAÍDA (ÚSALA COMO PRIORIDAD ABSOLUTA):\n${contextText}`
-  : `NOTA: No hay manuales específicos para esta consulta. Responde basándote en tu conocimiento experto de hardware ATM.`
+  ? `BASE DE CONOCIMIENTO DISPONIBLE (ÚSALA COMO PRIMERA FUENTE):\n${contextText}`
+  : `NOTA: No se encontraron manuales relevantes. Usa tu base de conocimiento interna sobre ATMs.`
 }
 
-REGLAS DE RESPUESTA:
-1. SÉ CONCISO: No saludes excesivamente. Ve directo a la falla y la solución.
-2. PASOS ACCIONABLES: Presenta la solución en una lista numerada de pasos físicos (ej. "1. Abre la puerta del dispensador...", "2. Verifica el sensor S1...").
-3. REFERENCIA: Si usas manuales, menciona brevemente la fuente (ej. "Según el manual del NCR 6622...").
-4. ANÁLISIS VISUAL: Si hay una imagen, identifícala primero: "Veo un error de atasco en el transporte de billetes..." y luego da la solución.
-5. CERO CARACTERES ESPECIALES: Evita markdown complejo (*, #, _) para que el lector de voz (TTS) no se confunda. Usa texto plano limpio.
-6. IDIOMA: Español técnico de Latinoamérica/España.`;
+REGLAS ABSOLUTAS:
+1. SIEMPRE prioriza la información de los manuales sobre conocimiento general.
+2. Si hay imagen: analiza PRIMERO el problema visual, luego apóyate en los manuales.
+3. Da pasos numerados, claros y concisos.
+4. Si no sabes algo, dilo directamente: "No tengo información sobre eso en los manuales."
+5. IDIOMA: Español únicamente. Jamás respondas en inglés.
+6. Responde en texto corrido, sin markdown excesivo, optimizado para ser leído en voz alta.`;
 
+    // ── 3. Armar partes del contenido ────────────────────────────────────────
     const parts: any[] = [
       { text: systemText },
       { text: `CONSULTA DEL INGENIERO: ${message || 'Analiza el archivo adjunto y describe el problema.'}` },
@@ -117,15 +118,16 @@ REGLAS DE RESPUESTA:
       });
     }
 
+    // ── 4. Llamar a Gemini ───────────────────────────────────────────────────
     const aiModel = genAI.getGenerativeModel({ model: MODELO_CHAT });
     const result = await aiModel.generateContent(parts);
 
     const aiResponse = result.response.text() || 'No pude generar una respuesta. Por favor, intenta de nuevo.';
 
-    // ── 3. Guardar en historial ──────────────────────────────────────────────
+    // ── 5. Guardar en historial ──────────────────────────────────────────────
     try {
       await supabase.from('query_history').insert({
-        engineer_id: engineerId || 'Invitado',
+        engineer_id: engineerId || null,
         query_text: message || '[Consulta visual]',
         response_text: aiResponse,
       });
@@ -140,19 +142,17 @@ REGLAS DE RESPUESTA:
     });
 
   } catch (error: any) {
-    console.error('[DOLA] Error en chat-multimodal:', error);
+    console.error('[AI] Error en chat-multimodal:', error);
     const msg: string = error?.message || JSON.stringify(error);
 
     if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
       return NextResponse.json(
-        { error: 'Límite de cuota de Gemini alcanzado. Espera 1 minuto e intenta de nuevo.' },
+        { error: 'Límite de cuota de Gemini alcanzado. Por favor espera 1 minuto e intenta de nuevo.' },
         { status: 429 }
       );
     }
-    
-    // Devolvemos el error real para depuración si es posible, o un mensaje limpio
     return NextResponse.json(
-      { error: `Error de la IA: ${msg.split('\n')[0]}` },
+      { error: 'Error interno del servidor. Revisa la consola para más detalles.' },
       { status: 500 }
     );
   }

@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     `;
 
     const naturalPrompt = `
-      ERES UN ASISTENTE TÉCNICO VIRTUAL (COMO ALEXA/DOLA).
+      ERES UN ASISTENTE TÉCNICO VIRTUAL EXPERTO.
       TONO: Extremadamente cordial, servicial, claro y profesional.
       ESTILO: Directo pero muy amable. Usa frases de cortesía ("Es un placer ayudarte", "Espero esto te sirva").
       META: Brindar una experiencia de soporte premium y fluida.
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       4. FORMATO: Usa Markdown para resaltar piezas o errores.
     `;
 
-    const aiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const aiModel = genAI.getGenerativeModel({ model: "gemini-2.1-flash-lite" });
 
     const result = await aiModel.generateContent([
       { text: systemPrompt },
