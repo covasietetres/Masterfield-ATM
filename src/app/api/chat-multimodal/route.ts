@@ -4,18 +4,18 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // ── Clientes ─────────────────────────────────────────────────────────────────
 // ── Configuración ─────────────────────────────────────────────────────────────
-const MODELO_CHAT      = 'gemini-1.5-flash';
-const MODELO_EMBEDDING = 'text-embedding-004';
+const MODELO_CHAT      = 'gemini-2.0-flash';
+const MODELO_EMBEDDING = 'gemini-embedding-2'; // Actualizado según disponibilidad en el entorno
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   if (!url || !key) return null;
   return createClient(url, key);
 }
 
 function getGenAI() {
-  const key = process.env.GEMINI_API_KEY!;
+  const key = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY!;
   if (!key) return null;
   return new GoogleGenerativeAI(key);
 }
@@ -26,7 +26,9 @@ export async function POST(request: Request) {
   const genAI = getGenAI();
 
   if (!supabase || !genAI) {
-    return NextResponse.json({ error: 'Configuración de servidor incompleta (Variables de entorno).' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Configuración de servidor incompleta. Verifica las variables de entorno en Vercel.' 
+    }, { status: 500 });
   }
 
   try {
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // ── 1. Buscar contexto en la base de conocimiento (sin costo de API) ─────
+    // ── 1. Buscar contexto en la base de conocimiento ─────
     let contextText = '';
     let usedManuals = false;
 
@@ -56,11 +58,13 @@ export async function POST(request: Request) {
             .map((k: string) => `content.ilike.%${k}%`)
             .join(',');
 
-          const { data: chunks } = await supabase
+          const { data: chunks, error: dbError } = await supabase
             .from('knowledge_chunks')
             .select('content, document_id, knowledge_documents(*)')
             .or(orFilters)
             .limit(8);
+
+          if (dbError) throw dbError;
 
           if (chunks && chunks.length > 0) {
             contextText = chunks
@@ -118,9 +122,10 @@ REGLAS DE RESPUESTA:
 
     const aiResponse = result.response.text() || 'No pude generar una respuesta. Por favor, intenta de nuevo.';
 
+    // ── 3. Guardar en historial ──────────────────────────────────────────────
     try {
       await supabase.from('query_history').insert({
-        engineer_id: engineerId || null,
+        engineer_id: engineerId || 'Invitado',
         query_text: message || '[Consulta visual]',
         response_text: aiResponse,
       });
@@ -140,12 +145,14 @@ REGLAS DE RESPUESTA:
 
     if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
       return NextResponse.json(
-        { error: 'Límite de cuota de Gemini alcanzado. Por favor espera 1 minuto e intenta de nuevo.' },
+        { error: 'Límite de cuota de Gemini alcanzado. Espera 1 minuto e intenta de nuevo.' },
         { status: 429 }
       );
     }
+    
+    // Devolvemos el error real para depuración si es posible, o un mensaje limpio
     return NextResponse.json(
-      { error: 'Error interno del servidor. Revisa la consola para más detalles.' },
+      { error: `Error de la IA: ${msg.split('\n')[0]}` },
       { status: 500 }
     );
   }

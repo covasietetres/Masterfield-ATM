@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       4. FORMATO: Usa Markdown para resaltar piezas o errores.
     `;
 
-    const aiModel = genAI.getGenerativeModel({ model: "gemini-2.1-flash-lite" });
+    const aiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const result = await aiModel.generateContent([
       { text: systemPrompt },
