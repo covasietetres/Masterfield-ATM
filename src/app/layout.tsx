@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import NotificationManager from "@/components/NotificationManager";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,6 +23,7 @@ export const metadata: Metadata = {
     initialScale: 1,
     maximumScale: 1,
     userScalable: false,
+    viewportFit: 'cover',
   },
   appleWebApp: {
     capable: true,
@@ -39,7 +41,7 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <head>
         <style dangerouslySetInnerHTML={{ __html: `
-          body { background-color: #020617 !important; color: #e2e8f0 !important; font-family: -apple-system, system-ui, sans-serif !important; }
+          body { background-color: #020617 !important; color: #e2e8f0 !important; font-family: -apple-system, system-ui, sans-serif !important; margin: 0; padding: 0; overflow-x: hidden; }
           .bg-slate-900 { background-color: #020617 !important; }
           .bg-slate-800 { background-color: #1e293b !important; }
           .bg-slate-950 { background-color: #020617 !important; }
@@ -61,13 +63,26 @@ export default function RootLayout({
           input { background-color: #020617 !important; color: #ffffff !important; border: 1px solid #334155 !important; border-radius: 0.375rem !important; padding: 0.625rem 1rem !important; }
           button { background-color: #2563eb !important; color: #ffffff !important; border-radius: 0.375rem !important; padding: 0.75rem 1.25rem !important; cursor: pointer !important; }
         ` }} />
+        <script dangerouslySetInnerHTML={{ __html: `
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                console.log('ServiceWorker registration successful with scope: ', registration.scope);
+              }, function(err) {
+                console.log('ServiceWorker registration failed: ', err);
+              });
+            });
+          }
+        ` }} />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
+        <NotificationManager />
         {children}
       </body>
     </html>
   );
 }
+
