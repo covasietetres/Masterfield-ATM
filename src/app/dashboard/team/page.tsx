@@ -39,7 +39,27 @@ export default function TeamChatPage() {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const [allEngineers, setAllEngineers] = useState<{name: string, isOnline: boolean}[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchEngineers = async () => {
+      const { data, error } = await supabase
+        .from('engineers')
+        .select('name')
+        .eq('is_active', true);
+      
+      if (!error && data) {
+        const engineersList = data.map(eng => ({
+          name: eng.name,
+          isOnline: onlineUsers.includes(eng.name)
+        }));
+        setAllEngineers(engineersList);
+      }
+    };
+
+    fetchEngineers();
+  }, [onlineUsers]);
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -312,8 +332,10 @@ export default function TeamChatPage() {
                 className="bg-slate-950 border border-slate-800 text-blue-400 text-[9px] md:text-[10px] font-black rounded-full md:rounded-xl px-4 py-1.5 md:py-2 outline-none focus:border-blue-500 transition-all cursor-pointer uppercase tracking-widest appearance-none sm:appearance-auto"
               >
                 <option value="ALL">Canal: [ Público ]</option>
-                {onlineUsers.map(user => (
-                  <option key={user} value={user}>Priv: {user}</option>
+                {allEngineers.map(eng => (
+                  <option key={eng.name} value={eng.name}>
+                    {eng.isOnline ? '🟢' : '⚪'} {eng.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -386,31 +408,36 @@ export default function TeamChatPage() {
 
               <h2 className="text-xs font-black text-white uppercase tracking-[0.3em] mb-10 flex items-center gap-4">
                 <Users className="w-5 h-5 text-blue-500" />
-                Unidades Activas
+                Personal Registrado
               </h2>
 
               <div className="space-y-4">
-                {onlineUsers.length === 0 ? (
+                {allEngineers.length === 0 ? (
                   <div className="p-10 rounded-3xl border-2 border-dashed border-slate-800 text-center">
-                    <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">Silencio en el sector</p>
+                    <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">Sincronizando personal...</p>
                   </div>
                 ) : (
-                  onlineUsers.map((user) => (
+                  allEngineers.map((eng) => (
                     <div 
-                      key={user}
+                      key={eng.name}
                       className="flex items-center justify-between p-5 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/20">
-                          <User className="w-6 h-6 text-white" />
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${eng.isOnline ? 'bg-blue-600 shadow-blue-600/20' : 'bg-slate-800'}`}>
+                          <User className={`w-6 h-6 ${eng.isOnline ? 'text-white' : 'text-slate-500'}`} />
                         </div>
-                        <span className="text-sm font-black text-white uppercase tracking-tighter">
-                          {user}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black text-white uppercase tracking-tighter">
+                            {eng.name}
+                          </span>
+                          <span className={`text-[8px] font-bold uppercase tracking-widest ${eng.isOnline ? 'text-emerald-500' : 'text-slate-600'}`}>
+                            {eng.isOnline ? 'Enlace Activo' : 'Fuera de Línea'}
+                          </span>
+                        </div>
                       </div>
                       <button 
-                        onClick={() => { makeCall(user); setIsSidebarOpen(false); }}
-                        className="p-4 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-900/40 active:scale-90"
+                        onClick={() => { if (eng.isOnline) { makeCall(eng.name); setIsSidebarOpen(false); } else { alert('El ingeniero está fuera de línea. Se le enviará una notificación.'); } }}
+                        className={`p-4 rounded-2xl shadow-lg active:scale-90 transition-all ${eng.isOnline ? 'bg-emerald-600 text-white shadow-emerald-900/40' : 'bg-slate-800 text-slate-600 cursor-not-allowed'}`}
                       >
                         <PhoneCall className="w-5 h-5" />
                       </button>
@@ -426,33 +453,40 @@ export default function TeamChatPage() {
         <div className="hidden md:block w-80 bg-slate-900/30 border-l border-slate-800 p-6 overflow-y-auto custom-scrollbar">
           <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-8 flex items-center gap-3">
             <Users className="w-4 h-4" />
-            Unidades en Línea
+            Personal Registrado
           </h2>
           <div className="space-y-3">
-            {onlineUsers.length === 0 ? (
+            {allEngineers.length === 0 ? (
               <div className="p-6 rounded-2xl border border-dashed border-slate-800 text-center">
-                <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest leading-loose">No hay señales de otras unidades en este cuadrante.</p>
+                <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest leading-loose">Sincronizando personal...</p>
               </div>
             ) : (
-              onlineUsers.map((user) => (
+              allEngineers.map((eng) => (
                 <div 
-                  key={user}
+                  key={eng.name}
                   className="group flex items-center justify-between p-4 rounded-2xl bg-slate-900/50 border border-slate-800/50 hover:bg-slate-900 hover:border-blue-500/50 transition-all shadow-lg"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700 group-hover:bg-blue-600 group-hover:border-blue-500 transition-all">
-                      <User className="w-5 h-5 text-slate-500 group-hover:text-white" />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all ${eng.isOnline ? 'bg-blue-600 border-blue-500 shadow-lg shadow-blue-600/20' : 'bg-slate-800 border-slate-700'}`}>
+                      <User className={`w-5 h-5 ${eng.isOnline ? 'text-white' : 'text-slate-500'}`} />
                     </div>
-                    <span className="text-xs font-black text-slate-300 group-hover:text-white transition-colors uppercase tracking-tight">
-                      {user}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className={`text-xs font-black transition-colors uppercase tracking-tight ${eng.isOnline ? 'text-white' : 'text-slate-400'}`}>
+                        {eng.name}
+                      </span>
+                      <span className={`text-[7px] font-bold uppercase tracking-widest ${eng.isOnline ? 'text-emerald-500' : 'text-slate-600'}`}>
+                        {eng.isOnline ? 'Enlace' : 'Desconectado'}
+                      </span>
+                    </div>
                   </div>
-                  <button 
-                    onClick={() => makeCall(user)}
-                    className="p-3 text-slate-500 hover:text-emerald-400 bg-slate-950 rounded-xl border border-slate-800 hover:border-emerald-500/50 transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 shadow-xl"
-                  >
-                    <PhoneCall className="w-4 h-4" />
-                  </button>
+                  {eng.isOnline && (
+                    <button 
+                      onClick={() => makeCall(eng.name)}
+                      className="p-3 text-slate-500 hover:text-emerald-400 bg-slate-950 rounded-xl border border-slate-800 hover:border-emerald-500/50 transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 shadow-xl"
+                    >
+                      <PhoneCall className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               ))
             )}
