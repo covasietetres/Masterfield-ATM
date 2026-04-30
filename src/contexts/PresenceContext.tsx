@@ -173,7 +173,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
            const gainNode = audioCtx.createGain();
            oscillator.type = 'sine';
            oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
-           gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime + start);
+           gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime + start);
            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + start + duration);
            oscillator.connect(gainNode);
            gainNode.connect(audioCtx.destination);

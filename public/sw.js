@@ -10,18 +10,26 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : { title: 'Alerta Técnica', body: 'Nueva notificación recibida' };
+  let data = { title: 'Alerta Técnica', body: 'Nueva notificación recibida' };
+  try {
+    data = event.data ? event.data.json() : data;
+  } catch (e) {
+    data = { title: 'Alerta Técnica', body: event.data.text() || data.body };
+  }
 
   const options = {
     body: data.body,
     icon: '/icon.png',
     badge: '/icon.png',
-    vibrate: [100, 50, 100],
+    vibrate: [200, 100, 200, 100, 200], // Stronger vibration
+    tag: 'critical-alert', // Avoid duplicates
+    renotify: true,
+    requireInteraction: true, // Notification stays until user acts
     data: {
-      url: data.url || '/dashboard'
+      url: data.url || '/dashboard/team'
     },
     actions: [
-      { action: 'open', title: 'Ver Alerta' }
+      { action: 'open', title: 'Atender Ahora 🛠️' }
     ]
   };
 
