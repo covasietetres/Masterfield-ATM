@@ -397,21 +397,25 @@ export default function TeamChatPage() {
                     payload: { targetUser, senderName: userEmail }
                   });
 
-                  // 2. Record in DB to trigger background Push Notifications for those who ARE NOT online
-                  const { error } = await supabase
-                    .from('critical_alerts')
-                    .insert({
-                      sender_name: userEmail,
-                      target_user: targetUser,
-                      type: 'bipper',
-                      status: 'pending'
+                  // 3. Trigger Server-Side PUSH for OFFLINE users
+                  try {
+                    await fetch('/api/send-push', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        targetUser,
+                        senderName: userEmail,
+                        title: '🚨 ALERTA CRÍTICA',
+                        body: `¡Atención! ${userEmail} te está enviando un BIP de alerta.`
+                      })
                     });
-
-                  if (error) console.error('Error saving critical alert:', error);
+                  } catch (e) {
+                    console.error('Error triggering server-side push:', e);
+                  }
 
                   // Local feedback
                   if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
-                  alert('¡Alerta de Bipper enviada a ' + targetUser + ' (incluyendo desconectados)!');
+                  alert('¡Alerta de Bipper enviada a ' + targetUser + ' (activando notificación push)!');
                 }}
                 className="p-4 md:p-5 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl transition-all shadow-2xl shadow-rose-900/40 active:scale-90 flex-shrink-0 border-2 border-rose-400/50"
                 title="Enviar Alerta Crítica (Bipper)"

@@ -62,9 +62,8 @@ export default function NotificationManager() {
       let subscription = await registration.pushManager.getSubscription();
       
       if (!subscription) {
-        // We use a public VAPID key (Placeholder, user should replace with their own)
-        // For testing, I'll use a standard one or suggest generating one.
-        const vapidPublicKey = 'BEl62iC7969_9mO9uF-X1pMTt-A3xM1kLAn3z.X.X.X'; // Placeholder
+        // Real VAPID public key
+        const vapidPublicKey = 'BGH5kEnV8lB15gY55z0x4gW95xssxaA3PfrroGBI4J00RWAC_Cx-KypAo9K0x0fgEEbv0vIO28hwD0Drz8niREc';
         
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
