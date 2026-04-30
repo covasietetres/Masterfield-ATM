@@ -2,12 +2,17 @@ import { NextResponse } from 'next/server';
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
 
-// Setup VAPID keys
-webpush.setVapidDetails(
-  'mailto:admin@atmfieldmaster.com',
-  process.env.VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+// We initialize VAPID inside the handler or check for env vars to avoid build-time errors
+const initVapid = () => {
+  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    throw new Error('VAPID keys not found in environment');
+  }
+  webpush.setVapidDetails(
+    'mailto:admin@atmfieldmaster.com',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+};
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,6 +21,7 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
+    initVapid();
     const { targetUser, senderName, title, body } = await request.json();
 
     // 1. Find all subscriptions for the target user
