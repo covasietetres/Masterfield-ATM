@@ -14,7 +14,7 @@ export default function DashboardLayout({
         <CallNotification />
         <PWAInstaller />
         <Sidebar />
-        <div className="md:ml-64 flex flex-col min-h-[100dvh]">
+        <div className="md:ml-72 flex flex-col min-h-[100dvh]">
           <main className="flex-1 p-4 pt-16 md:p-8 md:pt-8 max-w-[100vw] overflow-x-hidden">
             {children}
           </main>

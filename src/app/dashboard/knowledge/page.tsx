@@ -265,22 +265,23 @@ export default function KnowledgeBasePage() {
         </div>
       </header>
 
+      {/* Mobile Tabs Selector (Outside Grid) */}
+      <div className="lg:hidden flex p-1 bg-slate-900 rounded-2xl border border-slate-800 shadow-inner mb-6">
+        <button 
+          onClick={() => setActiveTab('upload')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'upload' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}
+        >
+          <Upload className="w-4 h-4" /> Manuales
+        </button>
+        <button 
+          onClick={() => setActiveTab('experience')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'experience' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-500'}`}
+        >
+          <PenTool className="w-4 h-4" /> Experiencias
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12">
-        {/* Mobile Tabs Selector */}
-        <div className="lg:hidden flex p-1 bg-slate-900 rounded-2xl border border-slate-800 shadow-inner">
-          <button 
-            onClick={() => setActiveTab('upload')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'upload' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}
-          >
-            <Upload className="w-4 h-4" /> Manuales
-          </button>
-          <button 
-            onClick={() => setActiveTab('experience')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'experience' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-500'}`}
-          >
-            <PenTool className="w-4 h-4" /> Experiencias
-          </button>
-        </div>
 
         {/* Column 1: Forms (Responsive Tabs) */}
         <div className="space-y-8 lg:block">
