@@ -57,13 +57,23 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
       if (!user) return;
 
       const email = user.email || 'Ingeniero Desconocido';
-      const shortName = email.split('@')[0];
-      setUserEmail(shortName);
+      
+      // Fetch full name from engineers table to sync with UI
+      const { data: engData } = await supabase
+        .from('engineers')
+        .select('name')
+        .eq('is_active', true)
+        .ilike('name', `%${email.split('@')[0]}%`) // Fallback search or we could assume email field exists
+        .single();
+
+      // If we found a name in the DB, use it, otherwise use email prefix
+      const displayName = engData?.name || email.split('@')[0];
+      setUserEmail(displayName);
 
       activeChannel = supabase.channel('engineering-frequency', {
         config: {
           broadcast: { self: false },
-          presence: { key: shortName }
+          presence: { key: displayName }
         }
       });
 
@@ -72,7 +82,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
       // Global Bipper Alert
       activeChannel.on('broadcast', { event: 'bipper' }, (payload) => {
         const p = payload.payload;
-        if (p.targetUser === 'ALL' || p.targetUser === shortName) {
+        if (p.targetUser === 'ALL' || p.targetUser === displayName) {
            playNotificationSound(p.senderName);
         }
       });
@@ -80,7 +90,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
       // Signaling Switchboard (Centralized)
       activeChannel.on('broadcast', { event: 'call_offer' }, (payload) => {
         const p = payload.payload;
-        if (p.targetUser === shortName) {
+        if (p.targetUser === displayName) {
            playNotificationSound();
            setIncomingCall({ senderName: p.senderName, offer: p.offer });
            signalCallbacks.current.forEach(cb => cb('call_offer', p));
@@ -89,21 +99,21 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
       activeChannel.on('broadcast', { event: 'call_answer' }, (payload) => {
         const p = payload.payload;
-        if (p.targetUser === shortName) {
+        if (p.targetUser === displayName) {
            signalCallbacks.current.forEach(cb => cb('call_answer', p));
         }
       });
 
       activeChannel.on('broadcast', { event: 'call_ice_candidate' }, (payload) => {
         const p = payload.payload;
-        if (p.targetUser === shortName) {
+        if (p.targetUser === displayName) {
            signalCallbacks.current.forEach(cb => cb('call_ice_candidate', p));
         }
       });
 
       activeChannel.on('broadcast', { event: 'call_hangup' }, (payload) => {
         const p = payload.payload;
-        if (p.targetUser === shortName) {
+        if (p.targetUser === displayName) {
            signalCallbacks.current.forEach(cb => cb('call_hangup', p));
         }
       });
@@ -114,13 +124,13 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         
         // Privacy Filter
         if (p.targetUser && p.targetUser !== 'ALL') {
-          if (p.targetUser !== shortName && p.senderName !== shortName) {
+          if (p.targetUser !== displayName && p.senderName !== displayName) {
             return; 
           }
         }
 
         // Play sound if message is not from self
-        if (p.senderName !== shortName) {
+        if (p.senderName !== displayName) {
           playNotificationSound(p.senderName);
         }
 
@@ -140,7 +150,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
       activeChannel.on('presence', { event: 'sync' }, () => {
         const state = activeChannel.presenceState();
         const users = Object.keys(state);
-        const otherUsers = users.filter(u => u !== shortName);
+        const otherUsers = users.filter(u => u !== displayName);
         setOnlineUsers(otherUsers);
       });
 

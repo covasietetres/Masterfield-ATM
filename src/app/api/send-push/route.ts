@@ -24,26 +24,35 @@ export async function POST(request: Request) {
     initVapid();
     const { targetUser, senderName, title, body } = await request.json();
 
-    // 1. Find all subscriptions for the target user
-    // We need to find the user_id for the target_user (engineer name)
-    const { data: engineer } = await supabase
-      .from('engineers')
-      .select('id')
-      .eq('name', targetUser)
-      .single();
+    // 1. Find all subscriptions for the target user(s)
+    let subscriptions = [];
 
-    if (!engineer) {
-      // If no engineer found, maybe it's 'ALL' or we just skip
-      return NextResponse.json({ success: false, error: 'User not found' });
+    if (targetUser === 'ALL') {
+      const { data } = await supabase
+        .from('push_subscriptions')
+        .select('subscription');
+      subscriptions = data || [];
+    } else {
+      // Find the user_id for the target_user (engineer name)
+      const { data: engineer } = await supabase
+        .from('engineers')
+        .select('id')
+        .eq('name', targetUser)
+        .single();
+
+      if (!engineer) {
+        return NextResponse.json({ success: false, error: 'User not found' });
+      }
+
+      const { data } = await supabase
+        .from('push_subscriptions')
+        .select('subscription')
+        .eq('user_id', engineer.id);
+      subscriptions = data || [];
     }
 
-    const { data: subscriptions } = await supabase
-      .from('push_subscriptions')
-      .select('subscription')
-      .eq('user_id', engineer.id);
-
-    if (!subscriptions || subscriptions.length === 0) {
-      return NextResponse.json({ success: false, error: 'No subscriptions found for user' });
+    if (subscriptions.length === 0) {
+      return NextResponse.json({ success: false, error: 'No subscriptions found' });
     }
 
     // 2. Send push to each subscription
