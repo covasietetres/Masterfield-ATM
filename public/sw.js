@@ -21,10 +21,12 @@ self.addEventListener('push', (event) => {
     body: data.body,
     icon: '/icon.png',
     badge: '/icon.png',
-    vibrate: [200, 100, 200, 100, 200], // Stronger vibration
-    tag: 'critical-alert', // Avoid duplicates
+    vibrate: [500, 110, 500, 110, 450, 110, 200, 110, 170, 40, 450, 110, 200, 110, 170, 40], // SOS style vibration
+    tag: 'critical-alert-' + Date.now(), // Unique tag to ensure it always sounds
     renotify: true,
-    requireInteraction: true, // Notification stays until user acts
+    requireInteraction: true,
+    silent: false,
+    priority: 'high',
     data: {
       url: data.url || '/dashboard/team'
     },

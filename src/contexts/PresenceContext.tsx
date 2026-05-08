@@ -37,6 +37,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
   const [incomingCall, setIncomingCall] = useState<{ senderName: string; offer: any } | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const signalCallbacks = useRef<((event: string, payload: any) => void)[]>([]);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   const onCallSignal = (callback: (event: string, payload: any) => void) => {
     signalCallbacks.current.push(callback);
@@ -44,6 +45,31 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
       signalCallbacks.current = signalCallbacks.current.filter(cb => cb !== callback);
     };
   };
+
+  useEffect(() => {
+    // Initialize AudioContext on first user interaction if possible
+    const initAudio = () => {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+    };
+
+    window.addEventListener('click', initAudio, { once: true });
+    window.addEventListener('touchstart', initAudio, { once: true });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && audioCtxRef.current) {
+        audioCtxRef.current.resume();
+      }
+    });
+
+    return () => {
+      window.removeEventListener('click', initAudio);
+      window.removeEventListener('touchstart', initAudio);
+    };
+  }, []);
 
   const addLocalMessage = (msg: ChatMessage) => {
     setMessages((prev) => [...prev, msg]);
@@ -167,37 +193,61 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
       });
     };
 
-    const playNotificationSound = (senderName?: string) => {
-       try {
-         // Show system notification if in background
-         if (document.visibilityState === 'hidden' && Notification.permission === 'granted') {
-           new Notification('🚨 ALERTA CRÍTICA', {
-             body: `${senderName || 'Un ingeniero'} te está enviando un BIP de alerta.`,
-             icon: '/icon.png'
-           });
-         }
+     const playNotificationSound = (senderName?: string) => {
+        try {
+          // 1. System Notification (Always try this for background/minimized)
+          if (Notification.permission === 'granted') {
+            const notification = new Notification('🚨 ALERTA CRÍTICA', {
+              body: `${senderName || 'Un ingeniero'} te está enviando un BIP de alerta.`,
+              icon: '/icon.png',
+              tag: 'bip-alert',
+            });
+            
+            // Interaction to help audio context
+            notification.onclick = () => {
+              window.focus();
+              notification.close();
+            };
+          }
 
-         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-         const playTone = (freq: number, start: number, duration: number) => {
-           const oscillator = audioCtx.createOscillator();
-           const gainNode = audioCtx.createGain();
-           oscillator.type = 'sine';
-           oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
-           gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime + start);
-           gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + start + duration);
-           oscillator.connect(gainNode);
-           gainNode.connect(audioCtx.destination);
-           oscillator.start(audioCtx.currentTime + start);
-           oscillator.stop(audioCtx.currentTime + start + duration);
-         };
+          // 2. Procedural Audio
+          if (!audioCtxRef.current) {
+            audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          }
+          
+          const audioCtx = audioCtxRef.current;
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
 
-         // Cell phone style "ding-ding" (A5 to C6)
-         playTone(880, 0, 0.1);
-         playTone(1046, 0.12, 0.25);
-       } catch (e) {
-         console.error("Audio error:", e);
-       }
-     };
+          const playTone = (freq: number, start: number, duration: number) => {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime + start);
+            gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime + start);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + start + duration);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.start(audioCtx.currentTime + start);
+            oscillator.stop(audioCtx.currentTime + start + duration);
+          };
+
+          // Aggressive cell phone style "ding-ding" (A5 to C6) repeated
+          for (let i = 0; i < 3; i++) {
+            const offset = i * 0.4;
+            playTone(880, offset, 0.1);
+            playTone(1046, offset + 0.12, 0.25);
+          }
+
+          // 3. Vibration
+          if ('vibrate' in navigator) {
+            navigator.vibrate([200, 100, 200, 100, 200]);
+          }
+        } catch (e) {
+          console.error("Audio error:", e);
+        }
+      };
 
     initPresence();
 
