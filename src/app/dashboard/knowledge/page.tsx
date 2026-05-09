@@ -7,6 +7,7 @@ import { Upload, FileText, CheckCircle, Database, Eye, X, Trash2, PenTool, MapPi
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { jsPDF } from 'jspdf';
+import { usePresence } from '@/contexts/PresenceContext';
 
 interface KnowledgeDocument {
   id: string;
@@ -27,6 +28,7 @@ export default function KnowledgeBasePage() {
   const [success, setSuccess] = useState(false);
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<KnowledgeDocument | null>(null);
+  const { userEmail } = usePresence();
 
   // OCR Reading Mode
   const [ocrMode, setOcrMode] = useState(false);
@@ -99,7 +101,7 @@ export default function KnowledgeBasePage() {
           file_type: fileExt === 'pdf' ? 'pdf' : (fileExt === 'mp4' ? 'video' : 'image'),
           brand: 'GENERIC',
           storage_path: storagePath,
-          uploaded_by: 'system'
+          uploaded_by: userEmail || 'Ingeniero'
         })
         .select()
         .single();
@@ -123,9 +125,10 @@ export default function KnowledgeBasePage() {
       setFile(null);
       fetchDocuments();
       setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Upload error:', err);
-      alert('Error al subir archivo');
+      const errorMessage = err.message || err.details || 'Error desconocido';
+      alert(`Error al subir archivo: ${errorMessage}`);
     } finally {
       setUploading(false);
     }
