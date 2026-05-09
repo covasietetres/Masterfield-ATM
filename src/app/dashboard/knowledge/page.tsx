@@ -26,6 +26,7 @@ export default function KnowledgeBasePage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [uploadBrand, setUploadBrand] = useState('General');
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<KnowledgeDocument | null>(null);
   const { userEmail } = usePresence();
@@ -99,7 +100,7 @@ export default function KnowledgeBasePage() {
         .insert({
           title: file.name,
           file_type: fileExt === 'pdf' ? 'pdf' : (fileExt === 'mp4' ? 'video' : 'image'),
-          brand: 'GENERIC',
+          brand: uploadBrand,
           storage_path: storagePath,
           uploaded_by: userEmail || 'Ingeniero'
         })
@@ -310,6 +311,20 @@ export default function KnowledgeBasePage() {
                   </div>
                   <input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} />
                 </label>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[9px] text-slate-500 uppercase font-black tracking-widest px-1">Marca del Documento</label>
+                <select 
+                  value={uploadBrand} 
+                  onChange={e => setUploadBrand(e.target.value)} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-[10px] font-bold text-white focus:outline-none focus:border-blue-500 transition-all appearance-none"
+                >
+                  <option>General</option>
+                  <option>NCR</option>
+                  <option>Diebold</option>
+                  <option>GRG</option>
+                </select>
               </div>
 
               {file && (
