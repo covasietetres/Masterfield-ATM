@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, CheckCircle, Database, Eye, X, Trash2, PenTool, MapPin, Tag, RotateCcw, Volume2, VolumeX, BookOpen, AlignLeft, Image as ImageIcon, Camera } from 'lucide-react';
+import { Upload, FileText, CheckCircle, Database, Eye, X, Trash2, PenTool, MapPin, Tag, RotateCcw, Volume2, VolumeX, BookOpen, AlignLeft, Image as ImageIcon, Camera, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { jsPDF } from 'jspdf';
@@ -30,6 +30,11 @@ export default function KnowledgeBasePage() {
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<KnowledgeDocument | null>(null);
   const { userEmail } = usePresence();
+  
+  // Drag & Drop / Search / Filter states
+  const [isDragging, setIsDragging] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState('Todos');
 
   // OCR Reading Mode
   const [ocrMode, setOcrMode] = useState(false);
@@ -77,6 +82,23 @@ export default function KnowledgeBasePage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -250,6 +272,16 @@ export default function KnowledgeBasePage() {
     }
   };
 
+  const filteredDocuments = documents.filter((doc) => {
+    const matchesBrand =
+      selectedFilter === 'Todos' ||
+      doc.brand.toLowerCase() === selectedFilter.toLowerCase();
+    const matchesSearch = doc.title
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    return matchesBrand && matchesSearch;
+  });
+
   return (
     <div suppressHydrationWarning className="max-w-6xl mx-auto space-y-6 md:space-y-10 pb-10">
       <header className="mb-4 md:mb-10 border-b border-slate-800 pb-8 relative overflow-hidden">
@@ -299,14 +331,34 @@ export default function KnowledgeBasePage() {
             </h2>
 
             <div className="space-y-6 relative z-10">
-              <div className="flex items-center justify-center w-full">
-                <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-52 border-2 border-slate-800 border-dashed rounded-3xl cursor-pointer bg-slate-950 hover:bg-slate-900 hover:border-blue-500/50 transition-all group/drop">
+              <div 
+                className="flex items-center justify-center w-full"
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <label 
+                  htmlFor="dropzone-file" 
+                  className={`flex flex-col items-center justify-center w-full h-52 border-2 border-dashed rounded-3xl cursor-pointer transition-all duration-300 ${
+                    isDragging 
+                      ? 'border-blue-500 bg-blue-600/10 scale-[1.02]' 
+                      : 'border-slate-800 bg-slate-950 hover:bg-slate-900 hover:border-blue-500/50'
+                  } group/drop`}
+                >
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 border border-slate-800 group-hover/drop:scale-110 group-hover/drop:bg-blue-600 transition-all">
-                      <Upload className="w-8 h-8 text-slate-500 group-hover/drop:text-white" />
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 border transition-all ${
+                      isDragging 
+                        ? 'bg-blue-600 border-blue-400 scale-110 text-white' 
+                        : 'bg-slate-900 border-slate-800 group-hover/drop:scale-110 group-hover/drop:bg-blue-600 text-slate-500 group-hover/drop:text-white'
+                    }`}>
+                      <Upload className={`w-8 h-8 ${isDragging ? 'text-white' : ''}`} />
                     </div>
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center px-6">
-                      Suelte <span className="text-blue-400">PDF, JPG o MP4</span> aquí
+                      {isDragging ? (
+                        <span className="text-blue-400 animate-pulse">¡Suelta el archivo aquí!</span>
+                      ) : (
+                        <>Suelte <span className="text-blue-400">PDF, JPG o MP4</span> aquí o haz clic</>
+                      )}
                     </p>
                   </div>
                   <input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} />
@@ -433,19 +485,61 @@ export default function KnowledgeBasePage() {
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-10 shadow-2xl flex flex-col h-[600px] md:h-[800px] relative overflow-hidden">
           <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2" />
           
-          <h2 className="text-xs font-black text-slate-100 uppercase tracking-[0.2em] mb-10 flex items-center gap-4 relative z-10">
+          <h2 className="text-xs font-black text-slate-100 uppercase tracking-[0.2em] mb-8 flex items-center gap-4 relative z-10">
             <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50" />
             Repositorio Técnico Central
           </h2>
 
+          {/* Search and Brand Filters */}
+          <div className="space-y-4 mb-8 relative z-10">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Buscar manual o documento..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 pl-12 pr-10 text-[10px] font-bold text-white focus:outline-none focus:border-blue-500 transition-all placeholder:text-slate-700"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-850 rounded-lg text-slate-500 hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Brand Pills */}
+            <div className="flex flex-wrap gap-2">
+              {['Todos', 'NCR', 'Diebold', 'GRG', 'General'].map((brand) => (
+                <button
+                  key={brand}
+                  onClick={() => setSelectedFilter(brand)}
+                  className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
+                    selectedFilter === brand
+                      ? 'bg-blue-600 border-blue-500/20 text-white shadow-lg shadow-blue-900/40'
+                      : 'bg-slate-950 border-slate-800/80 text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {brand}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-4 flex-1 overflow-y-auto pr-3 custom-scrollbar relative z-10">
-            {documents.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center opacity-20 space-y-4">
+            {filteredDocuments.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center opacity-20 space-y-4 py-20">
                 <FileText className="w-16 h-16 text-slate-400" />
-                <p className="text-[10px] font-black uppercase tracking-[0.3em]">Base de datos offline</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em]">
+                  {documents.length === 0 ? 'Base de datos offline' : 'Ningún documento coincide'}
+                </p>
               </div>
             ) : (
-              documents.map((doc) => (
+              filteredDocuments.map((doc) => (
                 <div key={doc.id} className="p-5 bg-slate-950/50 border border-slate-800/80 rounded-3xl flex flex-col sm:flex-row items-center gap-6 hover:border-slate-600 transition-all group backdrop-blur-sm relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
                     {doc.file_type === 'pdf' ? <FileText className="w-20 h-20" /> : <ImageIcon className="w-20 h-20" />}
